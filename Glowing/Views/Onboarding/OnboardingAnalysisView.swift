@@ -62,28 +62,11 @@ struct OnboardingAnalysisView: View {
     // MARK: - Analyzing
 
     private var analyzingContent: some View {
-        VStack(spacing: 24) {
-            // Animated icon
-            Image(systemName: "wand.and.stars")
-                .font(.system(size: 48))
-                .foregroundStyle(.tint)
-                .symbolEffect(.variableColor.iterative.reversing, options: .repeating)
-
-            VStack(spacing: 8) {
-                Text("Analyzing Your Skin")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text("Our AI is evaluating your photos to understand your skin and build a personalized routine.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-
-            ProgressView()
-                .padding(.top, 8)
-        }
+        GlowingBubbleView(
+            message: "Analyzing Your Skin",
+            submessage: "Our AI is evaluating your photos to understand your skin and build a personalized routine.",
+            accentColor: .blue
+        )
     }
 
     // MARK: - Error
