@@ -118,12 +118,10 @@ struct ProgressPhotoSessionDetailView: View {
             }
 
             if manager.isAnalyzing {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("Analyzing your skin...")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                GlowingBubbleView(
+                    message: "Analyzing your skin...",
+                    accentColor: .blue
+                )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             } else if let analysis {
