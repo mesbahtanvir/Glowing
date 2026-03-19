@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CameraOverlayView: View {
     let angle: PhotoAngle
+    var lightingCondition: LightingCondition?
 
     var body: some View {
         ZStack {
@@ -29,9 +30,14 @@ struct CameraOverlayView: View {
 
                 Spacer()
 
-                // Lighting tip pinned near bottom
-                lightingTip
-                    .padding(.bottom, 160)
+                // Live lighting indicator (replaces static tip when available)
+                if let condition = lightingCondition {
+                    liveLightingIndicator(condition)
+                        .padding(.bottom, 160)
+                } else {
+                    lightingTip
+                        .padding(.bottom, 160)
+                }
             }
         }
         .allowsHitTesting(false)
@@ -207,6 +213,49 @@ struct CameraOverlayView: View {
         .padding(.vertical, 8)
         .background(.black.opacity(0.5))
         .clipShape(Capsule())
+    }
+
+    // MARK: - Live Lighting Indicator
+
+    private func liveLightingIndicator(_ condition: LightingCondition) -> some View {
+        let (color, icon): (Color, String) = switch condition.qualityScore {
+        case .good: (.green, "checkmark.circle.fill")
+        case .acceptable: (.yellow, "exclamationmark.triangle.fill")
+        case .poor: (.red, "xmark.circle.fill")
+        }
+
+        let message: String = if let issue = condition.issues.first {
+            issue.shortMessage
+        } else {
+            "Good lighting"
+        }
+
+        return HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(color)
+
+            Text(message)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(0.9))
+
+            // Mini brightness bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.white.opacity(0.15))
+                    Capsule()
+                        .fill(color)
+                        .frame(width: geo.size.width * CGFloat(condition.faceBrightness))
+                }
+            }
+            .frame(width: 40, height: 4)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.black.opacity(0.6))
+        .clipShape(Capsule())
+        .animation(.easeInOut(duration: 0.3), value: condition.qualityScore.rawValue)
     }
 }
 

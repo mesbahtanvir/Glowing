@@ -5,7 +5,11 @@ import SwiftData
 enum OnboardingStep: Int, CaseIterable {
     case welcome
     case capture
-    case analyzing
+    case analyzing          // legacy single-shot analysis
+    case extractingDetails  // new: LLM call 1 — trait extraction
+    case reviewingDetails   // new: show detected traits
+    case clarifying         // new: ask user clarification questions
+    case generatingRoutines // new: LLM call 2 — routine generation
     case suggestedRoutine
     case complete
 }
@@ -25,6 +29,9 @@ final class OnboardingViewModel {
     var topConcerns: [String] = []
     var summary: String = ""
 
+    // Multi-step image analysis flow
+    let imageAnalysisVM = ImageAnalysisViewModel()
+
     // MARK: - Navigation
 
     func advance() {
@@ -40,7 +47,22 @@ final class OnboardingViewModel {
         }
     }
 
-    // MARK: - Analyze Photos
+    // MARK: - Multi-Step Analysis (New Flow)
+
+    /// Start the new multi-step image analysis flow after photos are captured
+    func startImageAnalysis() {
+        imageAnalysisVM.startFromExistingPhotos(capturedPhotos)
+        goToStep(.extractingDetails)
+    }
+
+    /// Called when the image analysis flow completes and routines are generated
+    func onImageAnalysisComplete() {
+        // Store generated routines for the suggested routine view
+        suggestedRoutineJSON = ["routines": imageAnalysisVM.generatedRoutines]
+        goToStep(.suggestedRoutine)
+    }
+
+    // MARK: - Legacy Single-Shot Analysis
 
     func analyzePhotos() async {
         isAnalyzing = true

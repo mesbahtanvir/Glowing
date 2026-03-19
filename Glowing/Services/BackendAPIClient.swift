@@ -65,6 +65,219 @@ final class BackendAPIClient {
         return OnboardingResult(skinAnalysisJSON: skinAnalysis, suggestedRoutineJSON: suggestedRoutine)
     }
 
+    // MARK: - Image Detail Extraction (LLM Call 1)
+
+    func extractImageDetails(images: [AnalysisImage]) async throws -> ImageAnalysisProfile {
+        if APIConfig.useMockBackend {
+            return try await extractImageDetailsDirect(images: images)
+        }
+
+        let url = APIConfig.baseURL.appendingPathComponent("analyze/extract-details")
+        let imagePayload = images.map { ["angle": $0.angle, "data": $0.base64Data] }
+        let body: [String: Any] = ["images": imagePayload]
+
+        let (data, _) = try await performRequest(url: url, body: body)
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError.invalidResponse
+        }
+        return ImageAnalysisProfile.fromJSON(json)
+    }
+
+    private func extractImageDetailsDirect(images: [AnalysisImage]) async throws -> ImageAnalysisProfile {
+        guard let apiKey = KeychainHelper.read(key: "com.glowing.openai-api-key") else {
+            throw APIError.noAPIKey
+        }
+
+        var userContent: [[String: Any]] = [
+            ["type": "text", "text": "Here are 3 face photos (front, left, right) of a man. Extract detailed traits for personalized routine generation."]
+        ]
+
+        for image in images {
+            userContent.append(["type": "text", "text": "[\(image.angle) view]:"])
+            userContent.append([
+                "type": "image_url",
+                "image_url": ["url": "data:image/jpeg;base64,\(image.base64Data)"]
+            ])
+        }
+
+        let systemPrompt = """
+        You are a dermatologist and trichologist. Analyze the 3 photos and extract structured traits. For each trait, provide a confidence level (high/medium/low) based on how clearly it's visible in the photos.
+
+        Return ONLY this JSON structure:
+
+        {
+          "skin": {
+            "skinType": "<oily|dry|combination|normal|sensitive>",
+            "skinTypeConfidence": "<high|medium|low>",
+            "isAcneProne": <true|false>,
+            "acneProneConfidence": "<high|medium|low>",
+            "hasPigmentation": <true|false>,
+            "hasSensitivity": <true|false>,
+            "hasDehydration": <true|false>,
+            "hasSunDamage": <true|false>
+          },
+          "hair": {
+            "hairPattern": "<straight|wavy|curly|coily>",
+            "hairPatternConfidence": "<high|medium|low>",
+            "hairThickness": "<fine|medium|coarse>",
+            "hairThicknessConfidence": "<high|medium|low>  (Note: hair thickness is hard to judge from photos — mark low unless very obvious)",
+            "hairLength": "<short|medium|long>",
+            "scalpConcerns": ["<dandruff|oiliness|dryness|thinning>"]  (empty array if none visible)
+          },
+          "lips": {
+            "condition": "<healthy|dry|chapped|cracked|pigmented>",
+            "needsCare": <true|false>
+          },
+          "eyebrows": {
+            "condition": "<well_groomed|sparse|overgrown|unibrow|asymmetric>",
+            "needsGrooming": <true|false>
+          },
+          "beard": {
+            "status": "<clean_shaven|stubble|short_beard|medium_beard|full_beard|patchy>",
+            "statusConfidence": "<high|medium|low>",
+            "growthPattern": "<even|patchy_cheeks|patchy_chin|neck_heavy>",
+            "growthPatternConfidence": "<high|medium|low>",
+            "canGrowFullBeard": <true|false|null>,
+            "recommendation": "<Your clinical assessment. Examples: 'Patchy on cheeks — recommend short stubble or clean shave' or 'Even growth with good density — user preference needed for style' or 'Clean shaven, no beard routine needed'>",
+            "needsUserPreference": <true|false>  (ONLY true when growth is decent and multiple styles would work. If patchy, set false and recommend trimming. If clean-shaven, set false.)
+          },
+          "face": {
+            "faceShape": "<oval|round|square|oblong|heart|diamond|triangle>"
+          }
+        }
+
+        IMPORTANT RULES:
+        - Be HONEST about confidence. If you can't clearly see something, mark it low.
+        - Hair thickness is almost always low confidence from photos unless the hair is very obviously fine or very thick.
+        - Beard: If growth is visibly patchy, do NOT set needsUserPreference to true. Recommend short stubble or clean shave directly. Only set needsUserPreference=true when growth is genuinely even and multiple styles would look good.
+        - Lips: Check for dryness, cracking, discoloration. Most men neglect lip care.
+        - Eyebrows: Check for stray hairs, sparse areas, unibrow, overgrowth.
+        - Scalp concerns: Only report what you can actually see. Don't guess.
+
+        Return ONLY valid JSON. No markdown, no explanation.
+        """
+
+        let requestBody: [String: Any] = [
+            "model": "gpt-4o",
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": userContent]
+            ],
+            "max_tokens": 1000,
+            "response_format": ["type": "json_object"]
+        ]
+
+        let result = try await callOpenAI(apiKey: apiKey, body: requestBody)
+        return ImageAnalysisProfile.fromJSON(result)
+    }
+
+    // MARK: - Routine Generation (LLM Call 2)
+
+    func generateRoutines(profile: ImageAnalysisProfile) async throws -> [[String: Any]] {
+        if APIConfig.useMockBackend {
+            return try await generateRoutinesDirect(profile: profile)
+        }
+
+        let url = APIConfig.baseURL.appendingPathComponent("generate/routines")
+        let body: [String: Any] = ["profile": profile.toPromptDescription()]
+
+        let (data, _) = try await performRequest(url: url, body: body)
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let routines = json["routines"] as? [[String: Any]] else {
+            throw APIError.invalidResponse
+        }
+        return routines
+    }
+
+    private func generateRoutinesDirect(profile: ImageAnalysisProfile) async throws -> [[String: Any]] {
+        guard let apiKey = KeychainHelper.read(key: "com.glowing.openai-api-key") else {
+            throw APIError.noAPIKey
+        }
+
+        let profileDescription = profile.toPromptDescription()
+
+        let systemPrompt = """
+        You are a board-certified dermatologist and licensed trichologist. Based on the patient profile below, generate personalized routines for skincare, hair care, and facial hair/beard care.
+
+        PATIENT PROFILE:
+        \(profileDescription)
+
+        Return a JSON object:
+        {
+          "routines": [
+            {
+              "name": "<routine name>",
+              "category": "<face|hair|stubble>",
+              "timeOfDay": "<morning|evening|weekly>",
+              "scheduledWeekdays": [<1=Sun..7=Sat, empty array = every day>],
+              "icon": "<SF Symbol name>",
+              "displayOrder": <int>,
+              "steps": [
+                {
+                  "title": "<step name>",
+                  "productName": "<specific product or ingredient>",
+                  "notes": "<technique, reasoning, common mistakes>",
+                  "timerDuration": <seconds or null>
+                }
+              ]
+            }
+          ]
+        }
+
+        ROUTINE GUIDELINES:
+
+        FACE routines:
+        - Morning (daily): Cleanse (60s), Vitamin C serum (30s absorb), Moisturizer, Sunscreen SPF 30+.
+        - Evening (daily): Cleanse, Treatment serum (niacinamide or retinol based on concerns), Moisturizer.
+        - Weekly: Chemical exfoliant (AHA/BHA) OR hydrating mask. NEVER exfoliate on shave days.
+        - Adjust for skin type: oily → gel cleanser, niacinamide. Dry → cream cleanser, hyaluronic acid. Sensitive → fragrance-free, skip actives initially.
+        - If lips need care: add lip balm with SPF in morning, lip treatment in evening.
+        - If eyebrows need grooming: add grooming step in weekly routine.
+
+        HAIR routines:
+        - Wash (2-3x/week, adjust by type): Shampoo + Conditioner. Oily/fine: more frequent. Dry/curly: less frequent.
+        - Scalp care (1x/week): Scalp exfoliation.
+        - Deep conditioning (bi-weekly): For damaged/dry hair.
+        - If thinning: daily scalp serum routine.
+
+        STUBBLE/BEARD routines:
+        - If clean-shaven: Skip stubble category entirely.
+        - If stubble: Trim 2-3x/week, neckline cleanup, PFB prevention.
+        - If short/medium beard: Beard wash 2-3x/week, daily beard oil, weekly trim.
+        - If full beard: Beard wash, oil, balm, weekly shaping.
+        - Exfoliation under beard 1x/week for ingrown prevention.
+
+        SCHEDULING:
+        - scheduledWeekdays=[] means every day.
+        - [2,4,6] = Mon/Wed/Fri. [3,5,7] = Tue/Thu/Sat. [1] = Sunday. [7] = Saturday.
+        - 5-8 routines total. Don't overload any single day.
+
+        RULES:
+        - 2-5 steps per routine. Simplicity drives adherence.
+        - Products: CeraVe, The Ordinary, La Roche-Posay, Neutrogena, Vanicream, Cetaphil, Bulldog, Duke Cannon.
+        - SF Symbols: "sun.max.fill", "moon.fill", "drop.fill", "scissors", "comb.fill", "humidity.fill", "leaf.fill", "sparkles".
+        - timerDuration: 60 for cleansers, 30 for serums, 120 for masks, 300 for deep conditioners, null for trim/style.
+        - Be specific: "salicylic acid 2% cleanser" not "cleanser".
+
+        Return ONLY valid JSON. No markdown.
+        """
+
+        let requestBody: [String: Any] = [
+            "model": "gpt-4o",
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": "Generate personalized routines based on the patient profile in the system prompt."]
+            ],
+            "max_tokens": 4000,
+            "response_format": ["type": "json_object"]
+        ]
+
+        let result = try await callOpenAI(apiKey: apiKey, body: requestBody)
+        return result["routines"] as? [[String: Any]] ?? []
+    }
+
     // MARK: - Backend HTTP Request
 
     private func performRequest(url: URL, body: [String: Any]) async throws -> (Data, URLResponse) {

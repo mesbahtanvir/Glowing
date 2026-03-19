@@ -27,6 +27,7 @@ struct OnboardingCaptureView: View {
             await cameraVM.checkAuthorization()
             if cameraVM.isAuthorized {
                 cameraVM.setupSession()
+                cameraVM.setLightingAnalysis(enabled: true)
             }
         }
         .onDisappear {
@@ -41,7 +42,7 @@ struct OnboardingCaptureView: View {
             CameraPreviewView(session: cameraVM.captureSession)
                 .ignoresSafeArea()
 
-            CameraOverlayView(angle: currentAngle)
+            CameraOverlayView(angle: currentAngle, lightingCondition: cameraVM.currentLighting)
                 .id(currentAngleIndex)
                 .transition(.opacity)
                 .animation(.easeInOut(duration: 0.3), value: currentAngleIndex)
@@ -126,9 +127,9 @@ struct OnboardingCaptureView: View {
                     currentAngleIndex += 1
                 }
             } else {
-                // All 3 photos captured — start analysis
-                viewModel.goToStep(.analyzing)
-                Task { await viewModel.analyzePhotos() }
+                // All 3 photos captured — start new multi-step analysis
+                cameraVM.setLightingAnalysis(enabled: false)
+                viewModel.goToStep(.extractingDetails)
             }
         }
     }
