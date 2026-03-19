@@ -56,6 +56,8 @@ struct ImageAnalysisProfile {
     var beardGrowthPattern: BeardGrowthPattern  // even, patchy_cheeks, patchy_chin, neck_heavy
     var beardGrowthPatternConfidence: Confidence
     var canGrowFullBeard: Bool?      // nil = unclear from images
+    var beardRecommendation: String   // LLM's assessment: e.g. "patchy cheeks — recommend stubble" or "even growth — ask user preference"
+    var needsBeardPreferenceInput: Bool // true only when growth is decent and style is genuinely ambiguous
 
     // Face
     var faceShape: String
@@ -134,9 +136,11 @@ struct ClarificationOption {
 
 **Logic for generating questions:**
 
-1. **Always ask** (regardless of confidence):
-   - "What beard style are you going for?" → Options: Full beard / Short beard / Stubble / Clean shaven
-   - This is a **preference**, not something detectable from images
+1. **Beard style — conditionally ask based on what the LLM sees:**
+   - If beard is clearly patchy/uneven → **Don't ask**. The LLM should recommend trimming short (stubble/clean) and explain why. Offering "full beard" when growth is visibly patchy would be bad advice.
+   - If beard growth is decent but ambiguous (could work as full beard OR stubble) → **Ask**: "Your facial hair growth looks solid. What style are you going for?" → Full beard / Short beard / Stubble / Clean shaven
+   - If clean-shaven with no visible growth → **Don't ask**. Skip beard routines, optionally include shaving routine.
+   - The extraction prompt should include a `beardRecommendation` field where the LLM states its assessment (e.g., "patchy on cheeks — recommend stubble or clean" vs. "even growth — user preference needed").
 
 2. **Ask if confidence is low/medium:**
    - Hair thickness: "How would you describe your hair?" → Fine/thin, Medium, Thick/coarse
@@ -219,17 +223,26 @@ Key methods:
     → [Clarification Questions] → [Generate Routines (LLM 2)] → [Show Results]
 ```
 
-### Clarification Decision Tree Example
+### Clarification Decision Tree Example — Beard
 ```
-Beard status detected: "patchy stubble" (medium confidence)
-  → Question: "What beard style are you going for?"
+Beard growth detected: "patchy on cheeks, decent on chin and jawline"
+  → LLM assessment: "Cannot grow full beard. Recommend short stubble or clean shave."
+  → NO question asked. LLM directly recommends:
+    → Stubble trim routine (1-1.5mm), neckline cleanup, PFB prevention
+
+Beard growth detected: "even, moderate density across all areas"
+  → LLM assessment: "Good growth potential. User preference needed."
+  → Question: "Your beard growth looks solid. What style are you going for?"
     → User picks "Full beard"
-      → LLM sees: wants full beard, but growth is patchy
-      → Routine: Beard growth tips, minoxidil consideration, patience timeline
-    → User picks "Clean shaven"
-      → Skip beard routines entirely, add shaving routine
+      → Beard wash, oil, balm, shaping routine
     → User picks "Stubble"
-      → Stubble maintenance routine, trimmer schedule
+      → Stubble maintenance, trimmer schedule
+    → User picks "Clean shaven"
+      → Skip beard routines, add shaving routine
+
+Beard growth detected: "clean shaven, no visible growth"
+  → LLM assessment: "Clean shaven. No beard routine needed."
+  → NO question asked. Skip beard category entirely.
 ```
 
 ---
@@ -256,7 +269,7 @@ Beard status detected: "patchy stubble" (medium confidence)
 
 2. **Confidence-based clarification**: Only ask questions when the AI isn't sure. This keeps the flow short for users with clearly visible traits while catching edge cases.
 
-3. **Preference questions always asked**: Beard style preference is always asked because it's about what the user *wants*, not what the AI can *see*.
+3. **Beard style is AI-driven, not always user-prompted**: If the LLM can see that beard growth is patchy, it should make the call (recommend stubble/clean) without asking. Only prompt the user when growth is genuinely ambiguous and multiple styles would work. This avoids offering bad options (e.g., "full beard" when cheeks are sparse).
 
 4. **Profile not persisted**: The `ImageAnalysisProfile` is transient — used only during the flow. The `SkinAnalysis` model continues to store the full analysis for progress tracking.
 
