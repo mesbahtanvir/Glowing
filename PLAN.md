@@ -225,7 +225,79 @@ Key methods:
 3. **`ClarificationView.swift`** — Presents clarification questions one-by-one or as a scrollable form. Each question has tappable option cards.
 4. **`RoutineResultsView.swift`** — Shows generated routines (can reuse existing `SuggestedRoutineView` pattern)
 
-### Phase 7: Integration Points
+### Phase 7: On-Device Lighting Analysis
+
+**New file**: `Glowing/Services/LightingAnalyzer.swift`
+
+Uses iOS built-in frameworks (no custom ML model) to assess photo lighting quality for consistent analysis across sessions.
+
+#### What It Measures
+
+| Metric | Framework | How |
+|--------|-----------|-----|
+| **Face brightness** | Vision + Core Image | Detect face bbox with `VNDetectFaceRectanglesRequest`, crop to face region, compute average luminance via `CIAreaAverage` |
+| **Lighting evenness** | Core Image | Split face region into left/right halves, compare average brightness. Large delta = directional/harsh lighting |
+| **Contrast** | Core Image | `CIAreaHistogram` on face region. Flat histogram = washed out, extreme spread = harsh shadows |
+| **Color temperature** | AVCapturePhoto | Read EXIF white balance from `photo.metadata` at capture time. Warm (incandescent) vs cool (daylight) affects skin tone perception |
+| **Exposure info** | AVCapturePhoto | ISO + exposure duration from EXIF. High ISO = noisy/dark environment |
+
+#### Data Model
+
+```swift
+struct LightingCondition {
+    let faceBrightness: Float        // 0.0 (black) to 1.0 (white), ideal ~0.45-0.65
+    let brightnessBalance: Float     // left-right delta, ideal < 0.1
+    let contrast: Float              // 0.0 (flat) to 1.0 (extreme), ideal 0.3-0.6
+    let colorTemperature: Int        // Kelvin estimate, ideal 5000-6500 (daylight)
+    let isoValue: Float              // camera ISO
+    let exposureDuration: Double     // seconds
+    let qualityScore: LightingQuality
+    let issues: [LightingIssue]
+}
+
+enum LightingQuality: String {
+    case good           // all metrics in ideal range
+    case acceptable     // minor issues, usable for analysis
+    case poor           // significant issues, warn user
+}
+
+enum LightingIssue: String {
+    case tooDark        // face brightness < 0.3
+    case tooBright      // face brightness > 0.8 (washed out)
+    case unevenLighting // left-right delta > 0.2 (window on one side)
+    case harshShadows   // high contrast on face
+    case warmTint       // color temp < 3500K (incandescent bulb)
+    case coolTint       // color temp > 7500K (fluorescent)
+}
+```
+
+#### Two Usage Points
+
+**A. Real-time feedback during capture (camera overlay):**
+- Run lightweight analysis on camera preview frames (every ~0.5s, throttled)
+- Show indicator in `CameraOverlayView`: green/yellow/red dot + short text
+  - Green: "Good lighting"
+  - Yellow: "Move closer to a window" / "Turn on more lights"
+  - Red: "Too dark for accurate analysis"
+- Use `AVCaptureVideoDataOutput` to sample preview frames
+- Only compute face brightness + balance (skip histogram for performance)
+
+**B. Post-capture session comparison:**
+- After photo capture, run full analysis on the final image
+- Store `LightingCondition` alongside `ProgressPhoto` session
+- On subsequent sessions, compare against the user's baseline (first session or best session)
+- Show warning if lighting differs significantly: "Your lighting looks different from your last session. This may affect score comparisons. Retake?"
+- Threshold: brightness delta > 0.15 or balance delta > 0.15 from baseline
+
+#### Why On-Device (Not LLM)
+
+- **Speed**: Core Image + Vision runs in <100ms, no network round-trip
+- **Real-time**: Can provide live camera feedback, LLM cannot
+- **Cost**: Free, no API tokens consumed
+- **Consistency**: Deterministic measurements, not subjective LLM judgment
+- **Privacy**: Photos never leave device for lighting checks
+
+### Phase 8: Integration Points
 
 1. **Onboarding flow**: Replace the single `analyzeOnboarding()` call in `OnboardingViewModel` with the new multi-step flow. The `OnboardingStep` enum gets new cases: `.extractingDetails`, `.clarifying`.
 
@@ -239,13 +311,15 @@ Key methods:
 
 ### Fresh Flow (New User / New Photos)
 ```
-[Take Photos] → [Extract Details (LLM 1)] → [Show Detected Traits]
+[Camera with live lighting feedback] → [Capture Photos] → [Check lighting vs baseline]
+    → [Extract Details (LLM 1)] → [Show Detected Traits]
     → [Clarification Questions] → [Generate Routines (LLM 2)] → [Show Results]
 ```
 
 ### Routine Flow (Existing User)
 ```
-[Load Latest Photos] → [Extract Details (LLM 1)] → [Show Detected Traits]
+[Load Latest Photos] → [Check lighting quality] → [Warn if poor/inconsistent]
+    → [Extract Details (LLM 1)] → [Show Detected Traits]
     → [Clarification Questions] → [Generate Routines (LLM 2)] → [Show Results]
 ```
 
@@ -278,12 +352,16 @@ Beard growth detected: "clean shaven, no visible growth"
 | Action | File | Description |
 |--------|------|-------------|
 | CREATE | `Models/ImageAnalysisProfile.swift` | Profile struct with traits + confidence |
+| CREATE | `Models/LightingCondition.swift` | Lighting metrics struct + quality enum |
+| CREATE | `Services/LightingAnalyzer.swift` | On-device lighting analysis (Vision + Core Image) |
 | CREATE | `Services/ImageAnalysisClarifier.swift` | Builds clarification questions from profile |
 | MODIFY | `Services/BackendAPIClient.swift` | Add `extractImageDetails()` and `generateRoutines()` methods |
 | CREATE | `ViewModels/ImageAnalysisViewModel.swift` | Multi-step flow orchestrator |
 | CREATE | `Views/ImageAnalysis/ImageAnalysisFlowView.swift` | Container view for the flow |
 | CREATE | `Views/ImageAnalysis/ExtractedDetailsView.swift` | Shows detected traits |
 | CREATE | `Views/ImageAnalysis/ClarificationView.swift` | Clarification question cards |
+| MODIFY | `Views/ProgressPhotos/CameraOverlayView.swift` | Add live lighting quality indicator |
+| MODIFY | `ViewModels/CameraViewModel.swift` | Add video data output for live lighting sampling |
 | MODIFY | `ViewModels/OnboardingViewModel.swift` | Integrate new flow into onboarding |
 | MODIFY | `GlowingApp.swift` | Register new model if needed |
 
@@ -299,4 +377,6 @@ Beard growth detected: "clean shaven, no visible growth"
 
 4. **Profile not persisted**: The `ImageAnalysisProfile` is transient — used only during the flow. The `SkinAnalysis` model continues to store the full analysis for progress tracking.
 
-5. **Reuse existing photo infrastructure**: No changes to camera/capture views. For "routine" flow, reuse `ProgressPhoto` sessions. For "fresh" flow, reuse `OnboardingCaptureView` or `ProgressPhotoCaptureView`.
+5. **Reuse existing photo infrastructure**: Minimal changes to camera/capture views (just adding lighting indicator). For "routine" flow, reuse `ProgressPhoto` sessions. For "fresh" flow, reuse `OnboardingCaptureView` or `ProgressPhotoCaptureView`.
+
+6. **On-device lighting analysis, not LLM**: Lighting checks use Vision + Core Image (<100ms, no network, deterministic). The LLM should never judge lighting — it's unreliable and slow. On-device analysis provides real-time camera feedback and consistent cross-session comparison.
