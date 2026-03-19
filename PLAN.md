@@ -50,6 +50,14 @@ struct ImageAnalysisProfile {
     var hairLength: HairLength       // short, medium, long
     var scalpConcerns: [String]      // dandruff, oiliness, dryness, thinning
 
+    // Lips
+    var lipsCondition: LipsCondition     // healthy, dry, chapped, cracked, pigmented
+    var needsLipCare: Bool               // true if any concern detected
+
+    // Eyebrows
+    var eyebrowCondition: EyebrowCondition  // well_groomed, sparse, overgrown, unibrow, asymmetric
+    var needsEyebrowGrooming: Bool          // true if grooming/shaping needed
+
     // Beard/Facial Hair
     var facialHairStatus: FacialHairStatus  // clean_shaven, stubble, short_beard, medium_beard, full_beard, patchy
     var facialHairStatusConfidence: Confidence
@@ -103,6 +111,22 @@ Add a new method `extractImageDetails(images:)` that calls the LLM with a focuse
 | Thinning/receding | Scalp treatment routines, minoxidil consideration |
 | Dandruff/flaking | Anti-dandruff wash frequency |
 
+#### Lips Traits
+| Trait | Why It Matters for Routines |
+|-------|---------------------------|
+| Dryness/chapping/cracking | Lip balm inclusion, lip scrub/exfoliant step |
+| Pigmentation/discoloration | Lip treatment with SPF, depigmenting balm |
+| Overall condition (healthy vs neglected) | Whether a dedicated lip care step is needed |
+
+#### Eyebrow Traits
+| Trait | Why It Matters for Routines |
+|-------|---------------------------|
+| Sparse/thin brows | Growth serum step (castor oil, peptide serum) |
+| Unibrow/stray hairs | Grooming/tweezing step in routine |
+| Overgrown/bushy | Trimming/shaping step |
+| Asymmetry | Professional shaping recommendation |
+| Well-groomed | No eyebrow step needed — skip |
+
 #### Beard/Facial Hair Traits
 | Trait | Why It Matters for Routines |
 |-------|---------------------------|
@@ -151,6 +175,8 @@ struct ClarificationOption {
    - Hair pattern (straight/wavy/curly) — visible
    - Current facial hair status — visible
    - Face shape — visible
+   - Lip condition (dry/chapped/healthy) — visible
+   - Eyebrow condition (sparse/overgrown/well-groomed) — visible
 
 ### Phase 4: Updated Routine Generation Prompt
 
