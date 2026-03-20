@@ -123,6 +123,10 @@ struct OnboardingAnalysisView: View {
                     .font(.title2)
                     .fontWeight(.bold)
 
+                Text("This is your starting point, not a grade.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Text(viewModel.summary)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -156,8 +160,8 @@ struct OnboardingAnalysisView: View {
     }
 
     private var scoreColor: Color {
-        if viewModel.overallScore >= 70 { return .green }
-        if viewModel.overallScore >= 40 { return .orange }
-        return .red
+        if viewModel.overallScore >= 70 { return .teal }
+        if viewModel.overallScore >= 40 { return .teal.opacity(0.6) }
+        return .teal.opacity(0.35)
     }
 }

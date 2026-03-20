@@ -7,9 +7,7 @@ struct ProgressPhotoGalleryView: View {
     @Query(sort: \SkinAnalysis.analyzedAt) private var allAnalyses: [SkinAnalysis]
     @State private var showCapture = false
     @State private var showCompare = false
-    @State private var showFaceImport = false
-    @State private var subscriptionManager = SubscriptionManager.shared
-    @State private var showPaywall = false
+    
 
     private var analysisBySession: [UUID: SkinAnalysis] {
         Dictionary(uniqueKeysWithValues: allAnalyses.map { ($0.sessionID, $0) })
@@ -21,7 +19,7 @@ struct ProgressPhotoGalleryView: View {
         return grouped.map { (id, photos) in
             let date = photos.map(\.capturedAt).max() ?? Date()
             let sorted = photos.sorted { a, b in
-                let order: [PhotoAngle] = [.front, .left, .right]
+                let order: [PhotoAngle] = [.front, .left, .right, .smile]
                 let ai = order.firstIndex(of: a.angle) ?? 0
                 let bi = order.firstIndex(of: b.angle) ?? 0
                 return ai < bi
@@ -67,22 +65,10 @@ struct ProgressPhotoGalleryView: View {
                         }
                     }
 
-                    Menu {
-                        Button {
-                            showCapture = true
-                        } label: {
-                            Label("Take Photos", systemImage: "camera.fill")
-                        }
-
-                        Divider()
-
-                        Button {
-                            showFaceImport = true
-                        } label: {
-                            Label("Import Face Photos", systemImage: "face.smiling")
-                        }
+                    Button {
+                        showCapture = true
                     } label: {
-                        Image(systemName: "plus")
+                        Image(systemName: "camera.fill")
                     }
                 }
             }
@@ -95,12 +81,6 @@ struct ProgressPhotoGalleryView: View {
                 ProgressPhotoCompareView()
             }
         }
-        .sheet(isPresented: $showFaceImport) {
-            FacePhotoImportView()
-        }
-        .sheet(isPresented: $showPaywall) {
-            PaywallView()
-        }
     }
 
     // MARK: - Empty State
@@ -109,7 +89,7 @@ struct ProgressPhotoGalleryView: View {
         ContentUnavailableView {
             Label("No Progress Photos", systemImage: "camera")
         } description: {
-            Text("Take photos or import from your library to start tracking your progress over time.")
+            Text("Take progress photos to start tracking your skin health over time.")
         } actions: {
             Button {
                 showCapture = true
@@ -118,14 +98,6 @@ struct ProgressPhotoGalleryView: View {
                     .font(.subheadline)
             }
             .buttonStyle(.borderedProminent)
-
-            Button {
-                showFaceImport = true
-            } label: {
-                Label("Import from Photos", systemImage: "photo.on.rectangle")
-                    .font(.subheadline)
-            }
-            .buttonStyle(.bordered)
         }
     }
 
@@ -164,19 +136,6 @@ struct ProgressPhotoGalleryView: View {
 
     // MARK: - Timeline Section
 
-    private static let freeSessionLimit = 2
-
-    private var visibleSessions: [(id: UUID, date: Date, photos: [ProgressPhoto])] {
-        if subscriptionManager.isPremium {
-            return sessions
-        }
-        return Array(sessions.prefix(Self.freeSessionLimit))
-    }
-
-    private var hasLockedSessions: Bool {
-        !subscriptionManager.isPremium && sessions.count > Self.freeSessionLimit
-    }
-
     private var timelineSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             if hasAnyScores {
@@ -186,7 +145,7 @@ struct ProgressPhotoGalleryView: View {
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(visibleSessions, id: \.id) { session in
+            ForEach(sessions, id: \.id) { session in
                 NavigationLink {
                     ProgressPhotoSessionDetailView(
                         sessionID: session.id,
@@ -202,33 +161,7 @@ struct ProgressPhotoGalleryView: View {
                 .buttonStyle(.plain)
             }
 
-            // Locked sessions teaser
-            if hasLockedSessions {
-                Button {
-                    showPaywall = true
-                } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: "lock.fill")
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                        Text("\(sessions.count - Self.freeSessionLimit) more session\(sessions.count - Self.freeSessionLimit == 1 ? "" : "s")")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text("Upgrade to Premium to view full history")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                    .background(Color(.systemGray6).opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color(.systemGray4), lineWidth: 0.5)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
+            
         }
     }
 
@@ -280,9 +213,9 @@ struct ProgressPhotoGalleryView: View {
     }
 
     private func scoreColor(_ score: Int) -> Color {
-        if score >= 70 { return .green }
-        if score >= 40 { return .orange }
-        return .red
+        if score >= 70 { return .teal }
+        if score >= 40 { return .teal.opacity(0.6) }
+        return .teal.opacity(0.35)
     }
 }
 

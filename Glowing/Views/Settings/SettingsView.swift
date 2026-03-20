@@ -7,6 +7,8 @@ struct SettingsView: View {
     @State private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
     @State private var showSignOutConfirmation = false
+    @State private var showStartFreshConfirmation = false
+    @State private var showOnboarding = false
 
     #if DEBUG
     private static let openAIKeyName = "com.glowing.openai-api-key"
@@ -82,6 +84,17 @@ struct SettingsView: View {
                 }
             }
 
+            // Start Fresh
+            Section {
+                Button(role: .destructive) {
+                    showStartFreshConfirmation = true
+                } label: {
+                    Label("Start Fresh", systemImage: "arrow.counterclockwise")
+                }
+            } footer: {
+                Text("Deletes all routines, photos, and analysis data. You'll redo the photo scan to get new personalized routines.")
+            }
+
             #if DEBUG
             // Developer
             Section("Developer") {
@@ -133,10 +146,52 @@ struct SettingsView: View {
         } message: {
             Text("Are you sure you want to sign out?")
         }
+        .confirmationDialog("Start Fresh", isPresented: $showStartFreshConfirmation) {
+            Button("Delete Everything & Rescan", role: .destructive) {
+                startFresh()
+            }
+        } message: {
+            Text("This will delete all your routines, progress photos, and analysis history. You'll be taken back to the photo scan to generate new routines.")
+        }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            OnboardingFlowView()
+        }
         .task {
             await subscriptionManager.loadProducts()
             await subscriptionManager.checkEntitlements()
         }
+    }
+
+    // MARK: - Start Fresh
+
+    private func startFresh() {
+        // Delete all routines (cascade deletes steps + day variants)
+        do {
+            let routines = try modelContext.fetch(FetchDescriptor<Routine>())
+            for routine in routines { modelContext.delete(routine) }
+
+            let logs = try modelContext.fetch(FetchDescriptor<RoutineLog>())
+            for log in logs { modelContext.delete(log) }
+
+            let photos = try modelContext.fetch(FetchDescriptor<ProgressPhoto>())
+            for photo in photos { modelContext.delete(photo) }
+
+            let analyses = try modelContext.fetch(FetchDescriptor<SkinAnalysis>())
+            for analysis in analyses { modelContext.delete(analysis) }
+        } catch {
+            // Best effort cleanup
+        }
+
+        // Reset onboarding flag
+        if let user = authManager.currentUser {
+            user.hasCompletedOnboarding = false
+        }
+
+        // Clear any pending background analysis
+        PendingAnalysisManager.shared.reset()
+
+        // Launch onboarding
+        showOnboarding = true
     }
 }
 

@@ -41,21 +41,6 @@ struct ImageAnalysisClarifier {
             ))
         }
 
-        // Hair thickness — hard to judge from photos alone
-        if profile.hairThicknessConfidence != .high {
-            questions.append(ClarificationQuestion(
-                id: "hairThickness",
-                category: .hair,
-                question: "How would you describe your hair?",
-                options: [
-                    ClarificationOption(label: "Fine / Thin", description: "Individual strands are thin, hair lacks volume", value: "fine"),
-                    ClarificationOption(label: "Medium", description: "Average thickness and volume", value: "medium"),
-                    ClarificationOption(label: "Thick / Coarse", description: "Individual strands are thick, lots of volume", value: "coarse"),
-                ],
-                trait: "hairThickness"
-            ))
-        }
-
         // Skin sensitivity — not reliably visible in photos
         if profile.skinTypeConfidence != .high && profile.skinType == .sensitive {
             questions.append(ClarificationQuestion(
@@ -99,12 +84,6 @@ struct ImageAnalysisClarifier {
                     profile.facialHairStatus = status
                     profile.needsBeardPreferenceInput = false
                     profile.beardRecommendation = "User chose: \(status.displayName)"
-                }
-
-            case "hairThickness":
-                if let thickness = HairThickness(rawValue: value) {
-                    profile.hairThickness = thickness
-                    profile.hairThicknessConfidence = .high
                 }
 
             case "skinSensitivity":

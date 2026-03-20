@@ -95,11 +95,12 @@ struct TimeOfDayTests {
 
 struct PhotoAngleTests {
 
-    @Test func allCasesContainsThreeAngles() {
-        #expect(PhotoAngle.allCases.count == 3)
+    @Test func allCasesContainsFourAngles() {
+        #expect(PhotoAngle.allCases.count == 4)
         #expect(PhotoAngle.allCases.contains(.front))
         #expect(PhotoAngle.allCases.contains(.left))
         #expect(PhotoAngle.allCases.contains(.right))
+        #expect(PhotoAngle.allCases.contains(.smile))
     }
 
     @Test func faceAnglesMatchesAllCases() {
@@ -110,6 +111,7 @@ struct PhotoAngleTests {
         #expect(PhotoAngle.front.displayName == "Front")
         #expect(PhotoAngle.left.displayName == "Left Side")
         #expect(PhotoAngle.right.displayName == "Right Side")
+        #expect(PhotoAngle.smile.displayName == "Smile")
     }
 
     @Test func guidanceTextIsNotEmpty() {
@@ -128,18 +130,21 @@ struct PhotoAngleTests {
         #expect(PhotoAngle.front.icon == "face.smiling")
         #expect(PhotoAngle.left.icon == "arrow.turn.up.left")
         #expect(PhotoAngle.right.icon == "arrow.turn.up.right")
+        #expect(PhotoAngle.smile.icon == "face.smiling.fill")
     }
 
     @Test func rawValues() {
         #expect(PhotoAngle.front.rawValue == "front")
         #expect(PhotoAngle.left.rawValue == "left")
         #expect(PhotoAngle.right.rawValue == "right")
+        #expect(PhotoAngle.smile.rawValue == "smile")
     }
 
     @Test func initFromRawValue() {
         #expect(PhotoAngle(rawValue: "front") == .front)
         #expect(PhotoAngle(rawValue: "left") == .left)
         #expect(PhotoAngle(rawValue: "right") == .right)
+        #expect(PhotoAngle(rawValue: "smile") == .smile)
         #expect(PhotoAngle(rawValue: "body") == nil)
         #expect(PhotoAngle(rawValue: "unknown") == nil)
     }
@@ -369,78 +374,118 @@ struct RoutineLogTests {
 
 struct SkinAnalysisCategoryTests {
 
+    private func makeEntries() -> [CategoryEntry] {
+        [
+            CategoryEntry(id: "active_acne", group: "skin", label: "Active acne", score: 6, note: "Mild chin breakout", confidence: "high"),
+            CategoryEntry(id: "acne_scars_pih", group: "skin", label: "Acne scars / PIH", score: 8, note: "Minimal scarring", confidence: "high"),
+            CategoryEntry(id: "redness_erythema", group: "skin", label: "Redness / erythema", score: 7, note: "Low redness", confidence: "high"),
+            CategoryEntry(id: "skin_texture", group: "skin", label: "Skin texture", score: 7, note: "Smooth overall", confidence: "medium"),
+            CategoryEntry(id: "dark_circles", group: "under_eye", label: "Dark circles", score: 5, note: "Moderate pigmentation", confidence: "high"),
+            CategoryEntry(id: "frizz_level", group: "hair", label: "Frizz level", score: 8, note: "Well controlled", confidence: "high"),
+            CategoryEntry(id: "density_thinning", group: "hair", label: "Density / thinning", score: 7, note: "Good density", confidence: "high"),
+            CategoryEntry(id: "dryness_chapping", group: "lips", label: "Dryness / chapping", score: 4, note: "Some peeling", confidence: "high"),
+            CategoryEntry(id: "pseudofolliculitis_barbae", group: "facial_hair", label: "Razor bumps / ingrowns", score: 6, note: "Minor bumps", confidence: "high"),
+            CategoryEntry(id: "eyebrow_grooming", group: "eyebrows", label: "Eyebrow grooming", score: 8, note: "Well shaped", confidence: "high"),
+            // New groups
+            CategoryEntry(id: "upper_eyelid_exposure", group: "eye_area", label: "Upper eyelid exposure", score: 7, note: "Slight hooding", confidence: "medium"),
+            CategoryEntry(id: "teeth_alignment", group: "teeth", label: "Teeth alignment", score: 8, note: "Straight teeth", confidence: "high"),
+            CategoryEntry(id: "nose_skin_quality", group: "nose", label: "Nose skin quality", score: 6, note: "Visible pores", confidence: "high"),
+            CategoryEntry(id: "jawline_definition", group: "facial_structure", label: "Jawline definition", score: 7, note: "Good definition", confidence: "high"),
+            CategoryEntry(id: "forward_head_posture", group: "neck_posture", label: "Forward head posture", score: 5, note: "Slight forward tilt", confidence: "medium"),
+            CategoryEntry(id: "overall_grooming", group: "overall_impression", label: "Overall grooming", score: 8, note: "Well put together", confidence: "high"),
+        ]
+    }
+
+    private func makeCategoriesJSON(_ entries: [CategoryEntry] = []) -> String {
+        let items = entries.isEmpty ? makeEntries() : entries
+        guard let data = try? JSONEncoder().encode(items),
+              let str = String(data: data, encoding: .utf8) else { return "[]" }
+        return str
+    }
+
     private func makeAnalysis(
         overallScore: Int = 75,
-        hairOverallScore: Int = 0,
-        bodyOverallScore: Int = 0
+        entries: [CategoryEntry]? = nil
     ) -> SkinAnalysis {
         SkinAnalysis(
             sessionID: UUID(),
             overallScore: overallScore,
             summary: "Test summary",
-            skinToneScore: 7, skinToneNote: "Good",
-            acneScore: 6, acneNote: "Mild",
-            pigmentationScore: 8, pigmentationNote: "Even",
-            scarsScore: 9, scarsNote: "Minimal",
-            textureScore: 7, textureNote: "Smooth",
-            darkCirclesScore: 5, darkCirclesNote: "Moderate",
-            poresScore: 6, poresNote: "Visible",
-            rednessScore: 8, rednessNote: "Low",
-            hairOverallScore: hairOverallScore,
-            bodyOverallScore: bodyOverallScore
+            categoriesJSON: makeCategoriesJSON(entries ?? makeEntries())
         )
     }
 
-    @Test func userFacingCategoriesCountIsSix() {
+    @Test func categoryEntriesDecodeCorrectly() {
         let analysis = makeAnalysis()
-        #expect(analysis.userFacingCategories.count == 6)
+        #expect(analysis.categoryEntries.count == 16)
     }
 
-    @Test func userFacingCategoryIds() {
+    @Test func skinCategoriesFilterCorrectly() {
         let analysis = makeAnalysis()
-        let ids = analysis.userFacingCategories.map(\.id)
-        #expect(ids.contains("acne"))
-        #expect(ids.contains("texture"))
-        #expect(ids.contains("hydration"))
-        #expect(ids.contains("darkCircles"))
-        #expect(ids.contains("redness"))
-        #expect(ids.contains("skinTone"))
+        let skinCats = analysis.skinCategories
+        #expect(skinCats.count == 4)
+        #expect(skinCats.allSatisfy { $0.group == "skin" })
     }
 
-    @Test func allCategoriesCountIsFifteen() {
+    @Test func hairCategoriesFilterCorrectly() {
         let analysis = makeAnalysis()
-        #expect(analysis.categories.count == 15)
-    }
-
-    @Test func hairCategoriesCountIsFour() {
-        let analysis = makeAnalysis(hairOverallScore: 7)
-        #expect(analysis.hairCategories.count == 4)
+        #expect(analysis.hairCategories.count == 2)
+        #expect(analysis.hairCategories.allSatisfy { $0.group == "hair" })
     }
 
     @Test func hasHairAnalysisWhenScoreAboveZero() {
-        let withHair = makeAnalysis(hairOverallScore: 5)
-        let withoutHair = makeAnalysis(hairOverallScore: 0)
+        let withHair = makeAnalysis()
         #expect(withHair.hasHairAnalysis)
-        #expect(!withoutHair.hasHairAnalysis)
+
+        let noHair = makeAnalysis(entries: [
+            CategoryEntry(id: "active_acne", group: "skin", label: "Active acne", score: 6, note: "Mild", confidence: "high")
+        ])
+        #expect(!noHair.hasHairAnalysis)
     }
 
-    @Test func hasBodyAnalysisWhenScoreAboveZero() {
-        let withBody = makeAnalysis(bodyOverallScore: 60)
-        let withoutBody = makeAnalysis(bodyOverallScore: 0)
-        #expect(withBody.hasBodyAnalysis)
-        #expect(!withoutBody.hasBodyAnalysis)
-    }
-
-    @Test func bodyCategoriesCountIsThree() {
-        let analysis = makeAnalysis(bodyOverallScore: 70)
-        #expect(analysis.bodyCategories.count == 3)
-    }
-
-    @Test func categoryResultHasCorrectScores() {
+    @Test func displayGroupsAreOrdered() {
         let analysis = makeAnalysis()
-        let acneCategory = analysis.userFacingCategories.first { $0.id == "acne" }
-        #expect(acneCategory?.score == 6)
-        #expect(acneCategory?.note == "Mild")
+        let groups = analysis.displayGroups
+        // Should have all 12 groups in display order
+        #expect(groups.count == 12)
+        #expect(groups[0].id == "skin")
+        #expect(groups[1].id == "under_eye")
+        #expect(groups[2].id == "eye_area")
+        #expect(groups[3].id == "lips")
+        #expect(groups[4].id == "teeth")
+        #expect(groups[5].id == "nose")
+        #expect(groups[6].id == "hair")
+        #expect(groups[7].id == "facial_hair")
+        #expect(groups[8].id == "eyebrows")
+        #expect(groups[9].id == "facial_structure")
+        #expect(groups[10].id == "neck_posture")
+        #expect(groups[11].id == "overall_impression")
+    }
+
+    @Test func topConcernsReturnsLowestScoring() {
+        let analysis = makeAnalysis()
+        let concerns = analysis.topConcerns
+        // Entries with score <= 5: dryness_chapping (4), dark_circles (5), forward_head_posture (5)
+        #expect(concerns.count == 3)
+        #expect(concerns[0].id == "dryness_chapping") // score 4, lowest first
+        // dark_circles and forward_head_posture both score 5
+        #expect(concerns[1].score == 5)
+        #expect(concerns[2].score == 5)
+    }
+
+    @Test func categoryEntryHasCorrectScores() {
+        let analysis = makeAnalysis()
+        let acne = analysis.categoryEntries.first { $0.id == "active_acne" }
+        #expect(acne?.score == 6)
+        #expect(acne?.note == "Mild chin breakout")
+        #expect(acne?.group == "skin")
+    }
+
+    @Test func groupAverageScoreCalculation() {
+        let analysis = makeAnalysis()
+        let skinGroup = analysis.displayGroups.first { $0.id == "skin" }
+        // skin entries: 6, 8, 7, 7 → avg = 7.0
+        #expect(skinGroup?.averageScore == 7.0)
     }
 }
 

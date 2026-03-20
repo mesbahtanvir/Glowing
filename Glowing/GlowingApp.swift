@@ -52,6 +52,7 @@ struct GlowingApp: App {
             ContentView()
             .task {
                 seedDefaultRoutines()
+                PendingAnalysisManager.shared.resumeIfNeeded()
             }
         }
         .modelContainer(sharedModelContainer)

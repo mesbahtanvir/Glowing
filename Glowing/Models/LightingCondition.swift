@@ -59,7 +59,7 @@ enum LightingIssue: String, CaseIterable {
 
 // MARK: - Lighting Condition
 
-struct LightingCondition {
+struct LightingCondition: Sendable {
     let faceBrightness: Float        // 0.0 (black) to 1.0 (white), ideal ~0.45-0.65
     let brightnessBalance: Float     // |left - right| delta, ideal < 0.1
     let contrast: Float              // 0.0 (flat) to 1.0 (extreme), ideal 0.3-0.6
@@ -70,7 +70,7 @@ struct LightingCondition {
     let issues: [LightingIssue]
     let timestamp: Date
 
-    init(
+    nonisolated init(
         faceBrightness: Float,
         brightnessBalance: Float,
         contrast: Float,

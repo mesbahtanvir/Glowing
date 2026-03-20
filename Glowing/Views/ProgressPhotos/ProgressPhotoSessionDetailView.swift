@@ -8,8 +8,8 @@ struct ProgressPhotoSessionDetailView: View {
     @State private var showDeleteConfirmation = false
     @State private var analysis: SkinAnalysis?
     @State private var manager = SkinAnalysisManager.shared
-    @State private var subscriptionManager = SubscriptionManager.shared
-    @State private var showPaywall = false
+
+    @Query(sort: \SkinAnalysis.analyzedAt) private var allAnalyses: [SkinAnalysis]
 
     let sessionID: UUID
     let date: Date
@@ -25,7 +25,7 @@ struct ProgressPhotoSessionDetailView: View {
     }
 
     private var sortedPhotos: [ProgressPhoto] {
-        let order: [PhotoAngle] = [.front, .left, .right]
+        let order: [PhotoAngle] = [.front, .left, .right, .smile]
         return photos.sorted { a, b in
             let ai = order.firstIndex(of: a.angle) ?? 0
             let bi = order.firstIndex(of: b.angle) ?? 0
@@ -33,42 +33,37 @@ struct ProgressPhotoSessionDetailView: View {
         }
     }
 
+    // MARK: - Before/After
+
+    private var previousSessionAnalysis: SkinAnalysis? {
+        let scored = allAnalyses
+            .filter { $0.overallScore > 0 && $0.sessionID != sessionID }
+            .sorted { $0.analyzedAt < $1.analyzedAt }
+        return scored.last { $0.analyzedAt < date }
+    }
+
+    private var deltaFromPrevious: Int? {
+        guard let current = analysis, current.overallScore > 0,
+              let previous = previousSessionAnalysis, previous.overallScore > 0 else { return nil }
+        let diff = current.overallScore - previous.overallScore
+        return diff != 0 ? diff : nil
+    }
+
+    // MARK: - Body
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // Date header
-                Text(date.formatted(.dateTime.weekday(.wide).month(.wide).day().year()))
-                    .font(.subheadline)
+            VStack(spacing: 16) {
+                // Date
+                Text(date.formatted(.dateTime.month(.abbreviated).day().year()))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 8)
 
-                // Full-size photos
-                ForEach(sortedPhotos, id: \.persistentModelID) { photo in
-                    VStack(alignment: .leading, spacing: 8) {
-                        // Angle label
-                        HStack(spacing: 6) {
-                            Image(systemName: photo.angle.icon)
-                                .font(.caption)
-                                .foregroundStyle(.blue)
-                            Text(photo.angle.displayName)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.secondary)
-                        }
+                // Photo strip
+                photoStrip
 
-                        // Photo
-                        if let data = photo.imageData,
-                           let uiImage = UIImage(data: data) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-
-                // Skin analysis section
+                // Analysis
                 skinAnalysisSection
                     .padding(.horizontal)
             }
@@ -77,6 +72,15 @@ struct ProgressPhotoSessionDetailView: View {
         .navigationTitle("Session Detail")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if analysis != nil {
+                    Button {
+                        runAnalysis()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                }
+            }
             ToolbarItem(placement: .destructiveAction) {
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
@@ -92,11 +96,38 @@ struct ProgressPhotoSessionDetailView: View {
         } message: {
             Text("This will permanently delete all photos and analysis from this session.")
         }
-        .sheet(isPresented: $showPaywall) {
-            PaywallView()
-        }
         .task {
             fetchAnalysis()
+        }
+    }
+
+    // MARK: - Photo Strip
+
+    private var photoStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(sortedPhotos, id: \.persistentModelID) { photo in
+                    if let data = photo.imageData,
+                       let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 250, height: 340)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(alignment: .bottomLeading) {
+                                Text(photo.angle.displayName)
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.ultraThinMaterial)
+                                    .clipShape(Capsule())
+                                    .padding(8)
+                            }
+                    }
+                }
+            }
+            .padding(.horizontal)
         }
     }
 
@@ -105,18 +136,6 @@ struct ProgressPhotoSessionDetailView: View {
     @ViewBuilder
     private var skinAnalysisSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Skin Analysis")
-                    .font(.headline)
-                Spacer()
-                if analysis != nil {
-                    Button("Re-analyze") {
-                        runAnalysis()
-                    }
-                    .font(.caption)
-                }
-            }
-
             if manager.isAnalyzing {
                 GlowingBubbleView(
                     message: "Analyzing your skin...",
@@ -125,8 +144,21 @@ struct ProgressPhotoSessionDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             } else if let analysis {
+                // Delta from previous
+                if let delta = deltaFromPrevious {
+                    HStack(spacing: 6) {
+                        Image(systemName: delta > 0 ? "arrow.up.right" : "arrow.down.right")
+                            .font(.caption)
+                            .foregroundStyle(delta > 0 ? .green : .orange)
+
+                        Text(delta > 0 ? "+\(delta) from last check-in" : "\(delta) from last check-in")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 SkinAnalysisResultView(analysis: analysis)
-            } else if subscriptionManager.isPremium {
+            } else {
                 Button {
                     runAnalysis()
                 } label: {
@@ -134,18 +166,7 @@ struct ProgressPhotoSessionDetailView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
-            } else {
-                Button {
-                    showPaywall = true
-                } label: {
-                    Label("Unlock AI Analysis", systemImage: "lock.fill")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
+                .buttonStyle(.bordered)
             }
 
             if let error = manager.lastError {
@@ -156,7 +177,7 @@ struct ProgressPhotoSessionDetailView: View {
         }
     }
 
-    // MARK: - Analysis Helpers
+    // MARK: - Helpers
 
     private func fetchAnalysis() {
         let sid = sessionID
@@ -177,10 +198,7 @@ struct ProgressPhotoSessionDetailView: View {
         }
     }
 
-    // MARK: - Delete
-
     private func deleteSession() {
-        // Delete analysis too
         let sid = sessionID
         if let existingAnalysis = try? modelContext.fetch(
             FetchDescriptor<SkinAnalysis>(

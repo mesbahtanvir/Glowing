@@ -72,6 +72,7 @@ struct SuggestedRoutineView: View {
             VStack(spacing: 12) {
                 Button {
                     viewModel.completeOnboarding(modelContext: modelContext)
+                    viewModel.goToStep(.complete)
                 } label: {
                     Text(routineArray.isEmpty ? "Continue" : "Looks Good")
                         .font(.headline)

@@ -12,9 +12,9 @@ struct CategoryTrendView: View {
 
     private var color: Color {
         guard let score = latestScore else { return .secondary }
-        if score >= 7 { return .green }
-        if score >= 4 { return .orange }
-        return .red
+        if score >= 7 { return .teal }
+        if score >= 4 { return .teal.opacity(0.6) }
+        return .teal.opacity(0.35)
     }
 
     var body: some View {

@@ -1,5 +1,6 @@
 import AVFoundation
 import UIKit
+import Vision
 
 @Observable
 final class CameraViewModel: NSObject {
@@ -10,6 +11,12 @@ final class CameraViewModel: NSObject {
     // Live lighting feedback
     var currentLighting: LightingCondition?
     var isLightingAnalysisEnabled = false
+
+    // Live face guidance
+    var currentFaceGuidance: FaceGuidance?
+    var targetAngle: PhotoAngle = .front
+    private var isFaceGuidanceEnabled = false
+    private var cachedScreenSize: CGSize = CGSize(width: 393, height: 852)
 
     let captureSession = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
@@ -92,6 +99,18 @@ final class CameraViewModel: NSObject {
             currentLighting = nil
         }
     }
+
+    /// Enable or disable live face guidance on camera preview frames
+    func setFaceGuidance(enabled: Bool, angle: PhotoAngle = .front) {
+        isFaceGuidanceEnabled = enabled
+        targetAngle = angle
+        if enabled {
+            cachedScreenSize = UIScreen.main.bounds.size
+        }
+        if !enabled {
+            currentFaceGuidance = nil
+        }
+    }
 }
 
 // MARK: - AVCapturePhotoCaptureDelegate
@@ -112,11 +131,11 @@ extension CameraViewModel: AVCapturePhotoCaptureDelegate {
     }
 }
 
-// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate (Live Lighting)
+// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate (Live Analysis)
 
 extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard isLightingAnalysisEnabled else { return }
+        guard isLightingAnalysisEnabled || isFaceGuidanceEnabled else { return }
 
         // Throttle: only analyze every 500ms
         let now = Date()
@@ -125,10 +144,50 @@ extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
 
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        let condition = LightingAnalyzer.shared.analyzeLiveFrame(pixelBuffer)
+        // Lighting analysis
+        var condition: LightingCondition?
+        if isLightingAnalysisEnabled {
+            condition = LightingAnalyzer.shared.analyzeLiveFrame(pixelBuffer)
+        }
+
+        // Face detection
+        var guidance: FaceGuidance?
+        if isFaceGuidanceEnabled {
+            guidance = detectFace(in: pixelBuffer)
+        }
 
         Task { @MainActor in
-            self.currentLighting = condition
+            if let condition { self.currentLighting = condition }
+            if let guidance { self.currentFaceGuidance = guidance }
         }
+    }
+
+    /// Run Vision face detection on a pixel buffer and return guidance
+    private func detectFace(in pixelBuffer: CVPixelBuffer) -> FaceGuidance {
+        let request = VNDetectFaceLandmarksRequest()
+        // Use .leftMirrored to match front camera mirrored preview
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .leftMirrored, options: [:])
+
+        let screenSize = cachedScreenSize
+
+        do {
+            try handler.perform([request])
+        } catch {
+            return FaceGuidance(faceBoundingBox: nil, faceYawDegrees: nil, targetAngle: targetAngle, screenSize: screenSize)
+        }
+
+        guard let face = request.results?.first else {
+            return FaceGuidance(faceBoundingBox: nil, faceYawDegrees: nil, targetAngle: targetAngle, screenSize: screenSize)
+        }
+
+        let bbox = face.boundingBox
+        let yawDegrees: Float? = face.yaw.map { $0.floatValue * 180 / .pi }
+
+        return FaceGuidance(
+            faceBoundingBox: bbox,
+            faceYawDegrees: yawDegrees,
+            targetAngle: targetAngle,
+            screenSize: screenSize
+        )
     }
 }

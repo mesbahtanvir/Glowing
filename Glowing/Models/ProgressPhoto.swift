@@ -5,6 +5,7 @@ enum PhotoAngle: String, Codable, CaseIterable {
     case front
     case left
     case right
+    case smile
 
     static var faceAngles: [PhotoAngle] { allCases }
 
@@ -13,6 +14,7 @@ enum PhotoAngle: String, Codable, CaseIterable {
         case .front: "Front"
         case .left: "Left Side"
         case .right: "Right Side"
+        case .smile: "Smile"
         }
     }
 
@@ -21,6 +23,7 @@ enum PhotoAngle: String, Codable, CaseIterable {
         case .front: "Look straight at the camera · Keep your chin level"
         case .left: "Turn 90° left · Align your ear inside the circle"
         case .right: "Turn 90° right · Align your ear inside the circle"
+        case .smile: "Smile naturally · Show your teeth"
         }
     }
 
@@ -29,6 +32,7 @@ enum PhotoAngle: String, Codable, CaseIterable {
         case .front: "Center your face in the oval. Keep shoulders level and visible."
         case .left: "Show your full left profile — ear, jawline, and neck visible."
         case .right: "Show your full right profile — ear, jawline, and neck visible."
+        case .smile: "Center your face and smile naturally showing your teeth."
         }
     }
 
@@ -37,6 +41,7 @@ enum PhotoAngle: String, Codable, CaseIterable {
         case .front: "face.smiling"
         case .left: "arrow.turn.up.left"
         case .right: "arrow.turn.up.right"
+        case .smile: "face.smiling.fill"
         }
     }
 }

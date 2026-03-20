@@ -249,7 +249,7 @@ struct CheckInManagerTests {
 
     private func makePhotosForSession(count: Int, date: Date = Date()) -> [ProgressPhoto] {
         let sessionID = UUID()
-        let angles: [PhotoAngle] = [.front, .left, .right]
+        let angles: [PhotoAngle] = [.front, .left, .right, .smile]
         return (0..<count).map { i in
             ProgressPhoto(
                 angle: angles[i % angles.count],
