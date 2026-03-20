@@ -69,10 +69,8 @@ final class OnboardingViewModel {
         analysisError = nil
 
         let images = capturedPhotos.compactMap { (angle, data) -> AnalysisImage? in
-            guard let base64 = UIImage(data: data)?
-                .jpegData(compressionQuality: 0.7)?
-                .base64EncodedString() else { return nil }
-            return AnalysisImage(angle: angle.rawValue, base64Data: base64)
+            let croppedData = FaceCropper.cropToFace(jpegData: data, compressionQuality: 0.7)
+            return AnalysisImage(angle: angle.rawValue, base64Data: croppedData.base64EncodedString())
         }
 
         do {
@@ -87,13 +85,21 @@ final class OnboardingViewModel {
             overallScore = result.skinAnalysisJSON["overallScore"] as? Int ?? 0
             summary = result.skinAnalysisJSON["summary"] as? String ?? ""
 
-            // Build top concerns from the 6 key metrics
+            // Build top concerns from grouped categories
             var concerns: [(String, Int)] = []
-            for key in ["acne", "texture", "hydration", "darkCircles", "redness", "skinTone"] {
-                if let cat = result.skinAnalysisJSON[key] as? [String: Any],
-                   let score = cat["score"] as? Int, score <= 5 {
-                    let name = key == "darkCircles" ? "Dark Circles" : key.capitalized
-                    concerns.append((name, score))
+            let groupKeys = ["skin", "hair", "lips", "under_eye", "facial_hair", "eyebrows", "eye_area", "teeth", "nose", "facial_structure", "neck_posture", "overall_impression"]
+            for groupKey in groupKeys {
+                if let groupDict = result.skinAnalysisJSON[groupKey] as? [String: Any] {
+                    for (_, value) in groupDict {
+                        if let catDict = value as? [String: Any],
+                           let score = catDict["score"] as? Int,
+                           let note = catDict["note"] as? String,
+                           score <= 5, score > 0 {
+                            // Use the note's first few words as a readable name
+                            let label = note.components(separatedBy: " ").prefix(3).joined(separator: " ")
+                            concerns.append((label, score))
+                        }
+                    }
                 }
             }
             topConcerns = concerns.sorted { $0.1 < $1.1 }.prefix(3).map(\.0)

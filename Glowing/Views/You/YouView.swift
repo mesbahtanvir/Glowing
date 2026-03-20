@@ -1,18 +1,18 @@
 import SwiftUI
 import SwiftData
+import Charts
 
 struct YouView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Routine.createdAt) private var routines: [Routine]
-    @Query private var logs: [RoutineLog]
     @Query(sort: \ProgressPhoto.capturedAt, order: .reverse) private var allPhotos: [ProgressPhoto]
     @Query(sort: \SkinAnalysis.analyzedAt) private var allAnalyses: [SkinAnalysis]
+    @Query private var logs: [RoutineLog]
+    @Query(sort: \Routine.createdAt) private var routines: [Routine]
 
     @State private var showCapture = false
     @State private var showCompare = false
-    @State private var showCreateRoutine = false
-    @State private var isRegenerating = false
-    @State private var regenerateError: String?
+    @State private var scoreAnimationProgress: CGFloat = 0
+    @State private var animatedScoreValue: Int = 0
 
     private var checkInManager = CheckInManager.shared
 
@@ -30,21 +30,16 @@ struct YouView: View {
 
     private var scoreDelta: Int? {
         guard let latest = latestAnalysis?.overallScore, let previous = previousAnalysis?.overallScore else { return nil }
-        return latest - previous
+        let diff = latest - previous
+        return diff != 0 ? diff : nil
     }
 
-    private var routinesByCategory: [(Category, [Routine])] {
-        let grouped = Dictionary(grouping: routines) { $0.category }
-        return Category.allCases
-            .compactMap { cat in
-                guard let items = grouped[cat], !items.isEmpty else { return nil }
-                return (cat, items.sorted {
-                    if $0.timeOfDay.sortOrder != $1.timeOfDay.sortOrder {
-                        return $0.timeOfDay.sortOrder < $1.timeOfDay.sortOrder
-                    }
-                    return $0.displayOrder < $1.displayOrder
-                })
-            }
+    private var recentScores: [ScoreDataPoint] {
+        allAnalyses
+            .filter { $0.overallScore > 0 }
+            .sorted { $0.analyzedAt < $1.analyzedAt }
+            .suffix(5)
+            .map { ScoreDataPoint(date: $0.analyzedAt, score: $0.overallScore) }
     }
 
     private var sessions: [(id: UUID, date: Date, photos: [ProgressPhoto])] {
@@ -52,7 +47,7 @@ struct YouView: View {
         return grouped.map { (id, photos) in
             let date = photos.map(\.capturedAt).max() ?? Date()
             let sorted = photos.sorted { a, b in
-                let order: [PhotoAngle] = [.front, .left, .right]
+                let order: [PhotoAngle] = [.front, .left, .right, .smile]
                 let ai = order.firstIndex(of: a.angle) ?? 0
                 let bi = order.firstIndex(of: b.angle) ?? 0
                 return ai < bi
@@ -62,12 +57,22 @@ struct YouView: View {
         .sorted { $0.date > $1.date }
     }
 
-    private var analysisBySession: [UUID: SkinAnalysis] {
-        Dictionary(uniqueKeysWithValues: allAnalyses.map { ($0.sessionID, $0) })
-    }
-
     private var dailyStreak: Int {
         StreakCalculator.currentDailyStreak(logs: logs, routines: routines)
+    }
+
+    private var totalCompletions: Int {
+        logs.filter { $0.isFullyCompleted }.count
+    }
+
+    private var checkInHint: String? {
+        let days = checkInManager.daysSinceLastCheckIn(photos: allPhotos)
+        if days == 0 || allPhotos.isEmpty { return nil }
+        if checkInManager.isDueForCheckIn(photos: allPhotos) {
+            return "Check-in due"
+        }
+        let remaining = 7 - days
+        return "Next check-in in \(remaining) day\(remaining == 1 ? "" : "s")"
     }
 
     // MARK: - Body
@@ -75,31 +80,42 @@ struct YouView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 20) {
-                    // Score card
+                VStack(spacing: 20) {
+                    // Score card — center of attention
                     if let latest = latestAnalysis {
-                        scoreCard(analysis: latest)
+                        NavigationLink {
+                            ProgressDashboardView()
+                        } label: {
+                            scoreCard(analysis: latest)
+                        }
+                        .buttonStyle(.plain)
                     }
 
-                    // Weekly check-in
-                    WeeklyCheckInBannerView {
-                        showCapture = true
+                    // Consistency stats
+                    if dailyStreak > 0 || totalCompletions > 0 || !sessions.isEmpty {
+                        consistencyRow
                     }
-                    .padding(.horizontal)
 
-                    // My Routines
-                    routinesSection
-
-                    // Photo timeline
-                    if !sessions.isEmpty {
-                        photoTimelineSection
+                    // Latest session photos
+                    if let latest = sessions.first {
+                        latestSessionView(latest)
                     }
+
+                    // Check-in action
+                    checkInSection
                 }
                 .padding(.vertical)
             }
             .navigationTitle("You")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    if sessions.count >= 2 {
+                        Button {
+                            showCompare = true
+                        } label: {
+                            Image(systemName: "square.split.2x1")
+                        }
+                    }
                     NavigationLink {
                         SettingsView()
                     } label: {
@@ -115,8 +131,26 @@ struct YouView: View {
                     ProgressPhotoCompareView()
                 }
             }
-            .sheet(isPresented: $showCreateRoutine) {
-                EditRoutineView()
+            .onAppear {
+                animateScore()
+            }
+        }
+    }
+
+    // MARK: - Score Animation
+
+    private func animateScore() {
+        guard let score = latestAnalysis?.overallScore, score > 0 else { return }
+        scoreAnimationProgress = 0
+        animatedScoreValue = 0
+        withAnimation(.easeOut(duration: 0.8)) {
+            scoreAnimationProgress = Double(score) / 100.0
+        }
+        let steps = min(score, 40)
+        let interval = 0.8 / Double(steps)
+        for i in 1...steps {
+            DispatchQueue.main.asyncAfter(deadline: .now() + interval * Double(i)) {
+                animatedScoreValue = Int(Double(score) * Double(i) / Double(steps))
             }
         }
     }
@@ -124,49 +158,89 @@ struct YouView: View {
     // MARK: - Score Card
 
     private func scoreCard(analysis: SkinAnalysis) -> some View {
-        HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .stroke(Color(.systemGray5), lineWidth: 6)
-                    .frame(width: 64, height: 64)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                // Animated score ring
+                ZStack {
+                    Circle()
+                        .stroke(Color(.systemGray5), lineWidth: 5)
+                        .frame(width: 52, height: 52)
 
-                Circle()
-                    .trim(from: 0, to: Double(analysis.overallScore) / 100.0)
-                    .stroke(scoreColor(analysis.overallScore), style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                    .frame(width: 64, height: 64)
-                    .rotationEffect(.degrees(-90))
+                    Circle()
+                        .trim(from: 0, to: scoreAnimationProgress)
+                        .stroke(scoreColor(analysis.overallScore), style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                        .frame(width: 52, height: 52)
+                        .rotationEffect(.degrees(-90))
 
-                Text("\(analysis.overallScore)")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .monospacedDigit()
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text("Skin Score")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-
-                    if let delta = scoreDelta, delta != 0 {
-                        Text(delta > 0 ? "+\(delta)" : "\(delta)")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(delta > 0 ? .green : .red)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background((delta > 0 ? Color.green : Color.red).opacity(0.12))
-                            .clipShape(Capsule())
-                    }
+                    Text("\(animatedScoreValue)")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .monospacedDigit()
                 }
 
-                Text(analysis.summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text("Skin Score")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Text(scoreLabel(analysis.overallScore))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+
+                        if let delta = scoreDelta {
+                            Text(delta > 0 ? "+\(delta)" : "\(delta)")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(delta > 0 ? .teal : .secondary)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background((delta > 0 ? Color.teal : Color.secondary).opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
+
+                    Text(analysis.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
 
-            Spacer(minLength: 0)
+            // Mini sparkline
+            if recentScores.count >= 2 {
+                Chart(recentScores) { point in
+                    LineMark(
+                        x: .value("Date", point.date),
+                        y: .value("Score", point.score)
+                    )
+                    .foregroundStyle(scoreColor(analysis.overallScore).opacity(0.6))
+                    .interpolationMethod(.catmullRom)
+
+                    AreaMark(
+                        x: .value("Date", point.date),
+                        y: .value("Score", point.score)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [scoreColor(analysis.overallScore).opacity(0.15), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .interpolationMethod(.catmullRom)
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .chartYScale(domain: 0...100)
+                .frame(height: 32)
+            }
         }
         .padding(14)
         .background(Color(.secondarySystemGroupedBackground))
@@ -174,311 +248,135 @@ struct YouView: View {
         .padding(.horizontal)
     }
 
-    // MARK: - Routines
+    // MARK: - Consistency Row
 
-    private var routinesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("My Routines")
+    private var consistencyRow: some View {
+        HStack(spacing: 0) {
+            if dailyStreak > 0 {
+                statItem(value: "\(dailyStreak)", label: "Day Streak", icon: "flame.fill", color: .orange)
+            }
+            if !sessions.isEmpty {
+                statItem(value: "\(sessions.count)", label: "Check-ins", icon: "camera", color: .blue)
+            }
+            if totalCompletions > 0 {
+                statItem(value: "\(totalCompletions)", label: "Completed", icon: "checkmark", color: .green)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func statItem(value: String, label: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 3) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                    .foregroundStyle(color)
+                Text(value)
                     .font(.subheadline)
                     .fontWeight(.semibold)
+                    .monospacedDigit()
+            }
+            Text(label)
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Latest Session
+
+    private func latestSessionView(_ session: (id: UUID, date: Date, photos: [ProgressPhoto])) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(session.date.formatted(.dateTime.month(.abbreviated).day().year()))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
-                Button {
-                    showCreateRoutine = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.caption)
-                        .fontWeight(.semibold)
+                if sessions.count > 1 {
+                    NavigationLink {
+                        ProgressPhotoGalleryView()
+                    } label: {
+                        Text("See All")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                    }
                 }
             }
             .padding(.horizontal)
 
-            if routines.isEmpty {
-                Text("No routines yet")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(routinesByCategory, id: \.0) { category, items in
-                        ForEach(items) { routine in
-                            NavigationLink {
-                                RoutineDetailView(routine: routine)
-                            } label: {
-                                routineRow(routine)
-                            }
-                            .buttonStyle(.plain)
-
-                            if !(category == routinesByCategory.last?.0 && routine.id == items.last?.id) {
-                                Divider()
-                                    .padding(.leading, 56)
+            NavigationLink {
+                ProgressPhotoSessionDetailView(
+                    sessionID: session.id,
+                    date: session.date
+                )
+            } label: {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(session.photos, id: \.persistentModelID) { photo in
+                            if let data = photo.imageData,
+                               let uiImage = UIImage(data: data) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 120, height: 160)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
                             }
                         }
                     }
-                }
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal)
-            }
-
-            // Regenerate with AI
-            if !allPhotos.isEmpty {
-                regenerateButton
                     .padding(.horizontal)
-            }
-        }
-    }
-
-    // MARK: - Regenerate
-
-    private var regenerateButton: some View {
-        Button {
-            Task { await regenerateRoutines() }
-        } label: {
-            HStack(spacing: 6) {
-                if isRegenerating {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Image(systemName: "wand.and.stars")
-                }
-                Text(isRegenerating ? "Regenerating..." : "Regenerate with AI")
-                    .fontWeight(.medium)
-            }
-            .font(.caption)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-        }
-        .buttonStyle(.bordered)
-        .disabled(isRegenerating)
-    }
-
-    private func regenerateRoutines() async {
-        guard let latestSession = sessions.first else { return }
-
-        isRegenerating = true
-        regenerateError = nil
-
-        // Build images from latest photo session
-        let images = latestSession.photos.compactMap { photo -> AnalysisImage? in
-            guard let data = photo.imageData,
-                  let uiImage = UIImage(data: data),
-                  let base64 = uiImage.jpegData(compressionQuality: 0.7)?.base64EncodedString()
-            else { return nil }
-            return AnalysisImage(angle: photo.angle.rawValue, base64Data: base64)
-        }
-
-        guard !images.isEmpty else {
-            isRegenerating = false
-            return
-        }
-
-        do {
-            let result = try await BackendAPIClient.shared.analyzeOnboarding(images: images)
-
-            // Delete existing routines
-            for routine in routines {
-                modelContext.delete(routine)
-            }
-
-            // Create new routines from AI response
-            if let json = result.suggestedRoutineJSON {
-                let routineArray = json["routines"] as? [[String: Any]] ?? []
-                for routineJSON in routineArray {
-                    let name = routineJSON["name"] as? String ?? "Routine"
-                    let categoryRaw = routineJSON["category"] as? String ?? "face"
-                    let category = Category(rawValue: categoryRaw) ?? .face
-                    let timeOfDayRaw = routineJSON["timeOfDay"] as? String ?? "morning"
-                    let timeOfDay = TimeOfDay(rawValue: timeOfDayRaw) ?? .morning
-                    let weekdays = routineJSON["scheduledWeekdays"] as? [Int] ?? []
-                    let icon = routineJSON["icon"] as? String ?? category.defaultIcon
-                    let displayOrder = routineJSON["displayOrder"] as? Int ?? 0
-
-                    let routine = Routine(
-                        name: name,
-                        category: category,
-                        timeOfDay: timeOfDay,
-                        scheduledWeekdays: Set(weekdays),
-                        displayOrder: displayOrder,
-                        icon: icon
-                    )
-                    modelContext.insert(routine)
-
-                    let steps = routineJSON["steps"] as? [[String: Any]] ?? []
-                    for (index, stepJSON) in steps.enumerated() {
-                        let step = RoutineStep(
-                            order: index,
-                            title: stepJSON["title"] as? String ?? "Step \(index + 1)",
-                            productName: stepJSON["productName"] as? String,
-                            notes: stepJSON["notes"] as? String,
-                            timerDuration: stepJSON["timerDuration"] as? Int
-                        )
-                        routine.steps.append(step)
-                    }
                 }
             }
-
-            isRegenerating = false
-        } catch {
-            regenerateError = error.localizedDescription
-            isRegenerating = false
+            .buttonStyle(.plain)
         }
     }
 
-    private func routineRow(_ routine: Routine) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: routine.icon)
-                .font(.callout)
-                .foregroundStyle(routine.category.accentColor)
-                .frame(width: 32, height: 32)
-                .background(routine.category.color)
-                .clipShape(Circle())
+    // MARK: - Check-in Section
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(routine.name)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.primary)
-
-                Text("\(routine.sortedSteps.count) steps · \(routine.timeOfDay.displayName)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            let streak = StreakCalculator.currentStreak(for: routine, logs: logs)
-            if streak > 0 {
-                StreakBadgeView(streak: streak)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-
-    // MARK: - Photo Timeline
-
-    private var photoTimelineSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Photo Timeline")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                NavigationLink {
-                    ProgressPhotoGalleryView()
-                } label: {
-                    Text("See All")
+    private var checkInSection: some View {
+        VStack(spacing: 8) {
+            Button {
+                showCapture = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "camera")
                         .font(.caption)
-                        .foregroundStyle(.blue)
+                    Text(sessions.isEmpty ? "Take First Photos" : "New Check-in")
+                        .font(.caption)
+                        .fontWeight(.medium)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
             }
+            .buttonStyle(.bordered)
             .padding(.horizontal)
 
-            VStack(spacing: 0) {
-                ForEach(Array(sessions.prefix(3)), id: \.id) { session in
-                    NavigationLink {
-                        ProgressPhotoSessionDetailView(
-                            sessionID: session.id,
-                            date: session.date
-                        )
-                    } label: {
-                        photoTimelineRow(session: session)
-                    }
-                    .buttonStyle(.plain)
-
-                    if session.id != sessions.prefix(3).last?.id {
-                        Divider()
-                            .padding(.leading, 68)
-                    }
-                }
-            }
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .padding(.horizontal)
-
-            if sessions.count >= 2 {
-                Button {
-                    showCompare = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "square.split.2x1")
-                        Text("Compare Photos")
-                    }
-                    .font(.caption)
-                    .fontWeight(.medium)
-                }
-                .padding(.horizontal)
+            if let hint = checkInHint {
+                Text(hint)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
         }
-    }
-
-    private func photoTimelineRow(session: (id: UUID, date: Date, photos: [ProgressPhoto])) -> some View {
-        HStack(spacing: 10) {
-            if let firstPhoto = session.photos.first,
-               let data = firstPhoto.imageData,
-               let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.date.formatted(.dateTime.month(.abbreviated).day().year()))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.primary)
-
-                Text("\(session.photos.count) photos")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if let analysis = analysisBySession[session.id], analysis.overallScore > 0 {
-                Text("\(analysis.overallScore)")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .monospacedDigit()
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(scoreColor(analysis.overallScore).opacity(0.15))
-                    .foregroundStyle(scoreColor(analysis.overallScore))
-                    .clipShape(Capsule())
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
     }
 
     // MARK: - Helpers
 
     private func scoreColor(_ score: Int) -> Color {
-        if score >= 70 { return .green }
-        if score >= 40 { return .orange }
-        return .red
+        if score >= 70 { return .teal }
+        if score >= 40 { return .teal.opacity(0.6) }
+        return .teal.opacity(0.35)
+    }
+
+    private func scoreLabel(_ score: Int) -> String {
+        if score >= 80 { return "Thriving" }
+        if score >= 60 { return "On Track" }
+        if score >= 40 { return "Building" }
+        return "Starting Out"
     }
 }
 
 #Preview {
     YouView()
-        .modelContainer(for: [Routine.self, RoutineStep.self, RoutineLog.self, StepDayVariant.self, ProgressPhoto.self, SkinAnalysis.self], inMemory: true)
+        .modelContainer(for: [ProgressPhoto.self, SkinAnalysis.self, RoutineLog.self, Routine.self], inMemory: true)
 }

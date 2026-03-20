@@ -46,8 +46,8 @@ struct SkinAnalysisResultView: View {
                 }
             }
 
-            // Profile badges (skin type + face shape)
-            if !analysis.skinType.isEmpty || !analysis.faceShape.isEmpty {
+            // Profile badges (skin type + face shape + hair type)
+            if !analysis.skinType.isEmpty || !analysis.faceShape.isEmpty || !analysis.hairType.isEmpty {
                 HStack(spacing: 8) {
                     if !analysis.skinType.isEmpty {
                         profileBadge(label: "Skin Type", value: analysis.skinType, icon: "drop.halffull")
@@ -55,14 +55,47 @@ struct SkinAnalysisResultView: View {
                     if !analysis.faceShape.isEmpty {
                         profileBadge(label: "Face Shape", value: analysis.faceShape, icon: "face.dashed")
                     }
+                    if !analysis.hairType.isEmpty {
+                        profileBadge(label: "Hair Type", value: analysis.hairType, icon: "comb.fill")
+                    }
                 }
             }
 
-            // Key metrics (6 user-facing categories)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(analysis.userFacingCategories) { category in
-                    categoryCard(category)
+            // Top concerns (lowest scoring categories)
+            let concerns = analysis.topConcerns
+            if !concerns.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Top Opportunities")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(concerns) { entry in
+                                HStack(spacing: 4) {
+                                    Text("\(entry.score)")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .monospacedDigit()
+                                        .foregroundStyle(scoreColor(entry.score, max: 10))
+                                    Text(entry.label)
+                                        .font(.caption2)
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(scoreColor(entry.score, max: 10).opacity(0.1))
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
                 }
+            }
+
+            // Grouped category sections
+            ForEach(analysis.displayGroups) { group in
+                groupSection(group)
             }
 
             // Recommendations
@@ -80,54 +113,7 @@ struct SkinAnalysisResultView: View {
                 }
             }
 
-            // Hair health section
-            if analysis.hasHairAnalysis {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "comb.fill")
-                            .font(.caption)
-                            .foregroundStyle(.indigo)
-                        Text("Hair Health")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text("\(analysis.hairOverallScore)/10")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .monospacedDigit()
-                            .foregroundStyle(scoreColor(analysis.hairOverallScore, max: 10))
-                    }
-
-                    if !analysis.hairOverallNote.isEmpty {
-                        Text(analysis.hairOverallNote)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        ForEach(analysis.hairCategories) { category in
-                            categoryCard(category)
-                        }
-                    }
-                }
-            }
-
             #if DEBUG
-            // Full categories (developer view)
-            VStack(alignment: .leading, spacing: 10) {
-                Text("All Categories (Debug)")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.orange)
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    ForEach(analysis.categories) { category in
-                        categoryCard(category)
-                    }
-                }
-            }
-
             // Per-side observations
             if !analysis.leftSideNote.isEmpty || !analysis.rightSideNote.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
@@ -145,6 +131,38 @@ struct SkinAnalysisResultView: View {
                 }
             }
             #endif
+        }
+    }
+
+    // MARK: - Group Section
+
+    private func groupSection(_ group: CategoryGroup) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Group header
+            HStack(spacing: 8) {
+                Image(systemName: group.icon)
+                    .font(.caption)
+                    .foregroundStyle(scoreColor(Int(group.averageScore.rounded()), max: 10))
+                Text(group.label)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(String(format: "%.1f", group.averageScore))
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .monospacedDigit()
+                    .foregroundStyle(scoreColor(Int(group.averageScore.rounded()), max: 10))
+                Text("avg")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(group.entries) { entry in
+                    categoryCard(entry)
+                }
+            }
         }
     }
 
@@ -169,30 +187,30 @@ struct SkinAnalysisResultView: View {
 
     // MARK: - Category Card
 
-    private func categoryCard(_ category: SkinAnalysis.CategoryResult) -> some View {
+    private func categoryCard(_ entry: CategoryEntry) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: category.icon)
-                .font(.caption)
-                .foregroundStyle(scoreColor(category.score, max: 10))
-                .frame(width: 18)
-
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Text(category.name)
+                    Text(entry.label)
                         .font(.caption2)
                         .fontWeight(.medium)
                         .lineLimit(1)
                     Spacer()
-                    Text("\(category.score)/10")
+                    Text("\(entry.score)/10")
                         .font(.caption2)
                         .fontWeight(.bold)
                         .monospacedDigit()
-                        .foregroundStyle(scoreColor(category.score, max: 10))
+                        .foregroundStyle(scoreColor(entry.score, max: 10))
                 }
-                Text(category.note)
+                Text(entry.note)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                if entry.confidence == "low" {
+                    Text("(low confidence)")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
         .padding(8)
@@ -250,15 +268,15 @@ struct SkinAnalysisResultView: View {
 
     private func scoreColor(_ score: Int, max: Int) -> Color {
         let ratio = Double(score) / Double(max)
-        if ratio >= 0.7 { return .green }
-        if ratio >= 0.4 { return .orange }
-        return .red
+        if ratio >= 0.7 { return .teal }
+        if ratio >= 0.4 { return .teal.opacity(0.6) }
+        return .teal.opacity(0.35)
     }
 
     private func scoreLabel(_ score: Int) -> String {
-        if score >= 80 { return "Excellent" }
-        if score >= 60 { return "Good" }
-        if score >= 40 { return "Fair" }
-        return "Needs Work"
+        if score >= 80 { return "Thriving" }
+        if score >= 60 { return "On Track" }
+        if score >= 40 { return "Building" }
+        return "Starting Out"
     }
 }

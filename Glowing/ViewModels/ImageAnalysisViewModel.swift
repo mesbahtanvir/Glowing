@@ -150,10 +150,8 @@ final class ImageAnalysisViewModel {
         error = nil
 
         let images = capturedPhotos.compactMap { (angle, data) -> AnalysisImage? in
-            guard let base64 = UIImage(data: data)?
-                .jpegData(compressionQuality: 0.7)?
-                .base64EncodedString() else { return nil }
-            return AnalysisImage(angle: angle.rawValue, base64Data: base64)
+            let croppedData = FaceCropper.cropToFace(jpegData: data, compressionQuality: 0.7)
+            return AnalysisImage(angle: angle.rawValue, base64Data: croppedData.base64EncodedString())
         }
 
         do {
@@ -191,7 +189,7 @@ final class ImageAnalysisViewModel {
     /// User manually overrides a detected trait
     func overrideTrait(_ trait: String, value: String) {
         guard profile != nil else { return }
-        var answers = [trait: value]
+        let answers = [trait: value]
         ImageAnalysisClarifier.applyAnswers(answers, to: &profile!)
     }
 

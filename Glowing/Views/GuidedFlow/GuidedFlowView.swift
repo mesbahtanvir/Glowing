@@ -221,39 +221,71 @@ struct GuidedFlowView: View {
 
     // MARK: - Completion Overlay
 
+    private var encouragement: String {
+        let messages = [
+            "Your future self will thank you.",
+            "Small steps, big results.",
+            "Consistency is your superpower.",
+            "Another day invested in you.",
+            "Building better habits, one step at a time.",
+            "That's how it's done.",
+            "You showed up. That's what matters."
+        ]
+        // Stable per-day selection so it doesn't jump on re-render
+        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 0
+        return messages[dayOfYear % messages.count]
+    }
+
+    private var bestStreak: (routine: Routine, streak: Int)? {
+        viewModel.routines
+            .map { ($0, StreakCalculator.currentStreak(for: $0, logs: logs)) }
+            .filter { $0.1 > 0 }
+            .max(by: { $0.1 < $1.1 })
+    }
+
     private var completionOverlay: some View {
         ZStack {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
                 .onTapGesture { dismiss() }
 
-            VStack(spacing: 24) {
+            VStack(spacing: 20) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 64))
+                    .font(.system(size: 56))
                     .foregroundStyle(.green)
 
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     if viewModel.routines.count > 1 {
                         Text("All Done!")
-                            .font(.title)
+                            .font(.title2)
                             .fontWeight(.bold)
-
-                        Text("\(viewModel.routines.count) routines completed")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
                     } else {
                         Text("Routine Complete!")
-                            .font(.title)
+                            .font(.title2)
                             .fontWeight(.bold)
-
-                        Text(viewModel.routines.first?.name ?? "")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
                     }
+
+                    Text(encouragement)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
 
-                // Streak info
-                streakInfo
+                // Best streak — single line, not per-routine
+                if let best = bestStreak {
+                    HStack(spacing: 6) {
+                        Image(systemName: "flame.fill")
+                            .foregroundStyle(.orange)
+                        Text("\(best.streak) day streak")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.1))
+                    .clipShape(Capsule())
+                }
 
                 Button {
                     dismiss()
@@ -271,23 +303,6 @@ struct GuidedFlowView: View {
             .clipShape(RoundedRectangle(cornerRadius: 28))
             .padding(.horizontal, 32)
             .sensoryFeedback(.success, trigger: showCompletion)
-        }
-    }
-
-    private var streakInfo: some View {
-        VStack(spacing: 8) {
-            ForEach(viewModel.routines) { routine in
-                let streak = StreakCalculator.currentStreak(for: routine, logs: logs)
-                if streak > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "flame.fill")
-                            .foregroundStyle(.orange)
-                        Text("\(routine.name): \(streak) day streak")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
         }
     }
 }

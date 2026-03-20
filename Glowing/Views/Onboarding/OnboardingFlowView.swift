@@ -3,6 +3,7 @@ import SwiftData
 
 struct OnboardingFlowView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @State private var viewModel = OnboardingViewModel()
 
     var body: some View {
@@ -55,11 +56,17 @@ struct OnboardingFlowView: View {
                         SuggestedRoutineView(viewModel: viewModel, modelContext: modelContext)
                     case .complete:
                         EmptyView()
+                    }
                 }
                 .transition(.asymmetric(
                     insertion: .move(edge: .trailing).combined(with: .opacity),
                     removal: .move(edge: .leading).combined(with: .opacity)
                 ))
+            }
+        }
+        .onChange(of: viewModel.currentStep) { _, newStep in
+            if newStep == .complete {
+                dismiss()
             }
         }
     }

@@ -90,7 +90,7 @@ final class BackendAPIClient {
         }
 
         var userContent: [[String: Any]] = [
-            ["type": "text", "text": "Here are 3 face photos (front, left, right) of a man. Extract detailed traits for personalized routine generation."]
+            ["type": "text", "text": "Here are 4 face photos (front, left, right, smile) of a man. Extract detailed traits for personalized routine generation."]
         ]
 
         for image in images {
@@ -102,7 +102,7 @@ final class BackendAPIClient {
         }
 
         let systemPrompt = """
-        You are a dermatologist and trichologist. Analyze the 3 photos and extract structured traits. For each trait, provide a confidence level (high/medium/low) based on how clearly it's visible in the photos.
+        You are a dermatologist and trichologist. Analyze the 4 photos and extract structured traits. For each trait, provide a confidence level (high/medium/low) based on how clearly it's visible in the photos.
 
         Return ONLY this JSON structure:
 
@@ -121,7 +121,7 @@ final class BackendAPIClient {
             "hairPattern": "<straight|wavy|curly|coily>",
             "hairPatternConfidence": "<high|medium|low>",
             "hairThickness": "<fine|medium|coarse>",
-            "hairThicknessConfidence": "<high|medium|low>  (Note: hair thickness is hard to judge from photos — mark low unless very obvious)",
+            "hairThicknessConfidence": "<high|medium|low>",
             "hairLength": "<short|medium|long>",
             "scalpConcerns": ["<dandruff|oiliness|dryness|thinning>"]  (empty array if none visible)
           },
@@ -309,7 +309,7 @@ final class BackendAPIClient {
         }
 
         var userContent: [[String: Any]] = [
-            ["type": "text", "text": "Here are 3 face photos (front, left, right). Analyze them together for a comprehensive skin assessment."]
+            ["type": "text", "text": "Here are 4 face photos (front, left, right, smile). Analyze them together for a comprehensive assessment."]
         ]
 
         for image in images {
@@ -321,40 +321,119 @@ final class BackendAPIClient {
         }
 
         let systemPrompt = """
-        You are a men's skincare and hair health consultant with dermatology training. You have HIGH STANDARDS. A 7/10 means genuinely good, 8+ is exceptional. Most people should score 4-6.
+        You are a men's skincare and hair health consultant with dermatology training. Scores reflect this person's own skin health potential — how close each area is to its personal best, not a comparison with others. A 6/10 means there's clear room for improvement with the right routine. An 8/10 means this area is well-maintained.
 
-        Cross-reference all 3 angles (front, left, right) together. Analyze both skin and hair health.
+        Cross-reference all 4 angles (front, left, right, smile) together. Analyze skin, hair, lips, under-eye area, eye area, teeth/smile, nose, facial hair, eyebrows, facial structure, neck/posture, and overall impression.
 
-        SCORING RULES:
-        - 9-10: Near-flawless. Almost nobody gets this.
-        - 7-8: Genuinely good, minor issues only.
-        - 5-6: Average. Noticeable issues that need attention.
-        - 3-4: Below average. Multiple visible problems.
-        - 1-2: Significant issues requiring immediate attention.
-        - Be SPECIFIC in notes — say exactly where the issue is.
+        The smile photo shows teeth. Use it for teeth alignment, whiteness, smile symmetry, and gum-to-tooth ratio.
 
-        Return a JSON object:
+        SCORING GUIDANCE:
+        - 8-10: This area is well-maintained. Minor refinements at most.
+        - 6-7: Healthy baseline with room to improve through consistent care.
+        - 4-5: Noticeable room for improvement. A good routine will help.
+        - 1-3: This area would benefit most from focused attention.
+        - Be SPECIFIC in notes — mention exact locations and what to look for.
+        - Frame observations as opportunities, not problems.
+        - Include "confidence": "high"|"medium"|"low" for each category based on how clearly visible it is in the photos.
+
+        Return a JSON object with grouped categories:
 
         {
-          "overallScore": <0-100 integer, most people should be 40-65>,
-          "summary": "<2-3 sentences. Be direct. Tell them what stands out and what to fix first.>",
-          "acne": { "score": <0-10>, "note": "<exact locations — chin, forehead, left cheek, etc. Note active vs scarred>" },
-          "texture": { "score": <0-10>, "note": "<roughness, bumps, flaking — compare T-zone vs cheeks vs sides>" },
-          "hydration": { "score": <0-10>, "note": "<oily zones, dry patches, flaking, dehydration lines>" },
-          "darkCircles": { "score": <0-10>, "note": "<color (purple, brown, blue), puffiness, hollowness>" },
-          "redness": { "score": <0-10>, "note": "<rosacea-like, irritation, razor burn, location>" },
-          "skinTone": { "score": <0-10>, "note": "<unevenness, tan lines, sun damage per area>" },
-          "skinType": "<one of: oily, dry, combination, normal, sensitive>",
-          "faceShape": "<one of: oval, round, square, oblong, heart, diamond, triangle>",
+          "overallScore": <0-100 integer reflecting personal potential>,
+          "summary": "<2-3 sentences. Frame as current state and opportunity, not criticism.>",
+          "skinType": "<oily|dry|combination|normal|sensitive>",
+          "faceShape": "<oval|round|square|oblong|heart|diamond|triangle>",
+          "hairType": "<straight|wavy|curly|coily>",
           "leftSideNote": "<1-2 sentences on left profile specifics>",
           "rightSideNote": "<1-2 sentences on right profile specifics>",
           "recommendations": "<3-5 specific product/ingredient suggestions as bullet points separated by newlines>",
-          "hairOverall": { "score": <0-10>, "note": "<overall hair health assessment>" },
-          "hairline": { "score": <0-10>, "note": "<recession, density at temples>" },
-          "hairThickness": { "score": <0-10>, "note": "<thickness, volume assessment>" },
-          "hairCondition": { "score": <0-10>, "note": "<damage, split ends, dryness>" },
-          "scalpHealth": { "score": <0-10>, "note": "<dandruff, irritation, oiliness>" },
-          "hairType": "<straight/wavy/curly/coily>"
+          "skin": {
+            "active_acne": { "score": <0-10>, "note": "<papules, pustules, cysts, whiteheads, blackheads — type, count, locations>", "confidence": "<high|medium|low>" },
+            "acne_scars_pih": { "score": <0-10>, "note": "<PIH, ice-pick, rolling, boxcar scars — location and severity>", "confidence": "<high|medium|low>" },
+            "redness_erythema": { "score": <0-10>, "note": "<diffuse redness, broken capillaries, rosacea indicators>", "confidence": "<high|medium|low>" },
+            "oiliness_shine": { "score": <0-10>, "note": "<T-zone shine, overall sebum levels>", "confidence": "<high|medium|low>" },
+            "pore_visibility": { "score": <0-10>, "note": "<enlarged pores, congestion — nose, cheeks, forehead>", "confidence": "<high|medium|low>" },
+            "skin_texture": { "score": <0-10>, "note": "<smoothness, roughness, bumps, KP, milia>", "confidence": "<high|medium|low>" },
+            "hyperpigmentation": { "score": <0-10>, "note": "<melasma, sun spots, age spots, dark patches>", "confidence": "<high|medium|low>" },
+            "skin_tone_evenness": { "score": <0-10>, "note": "<colour uniformity, blotchiness, discolouration>", "confidence": "<high|medium|low>" },
+            "dryness_flakiness": { "score": <0-10>, "note": "<peeling, flaking, dry patches, dehydration lines>", "confidence": "<high|medium|low>" },
+            "wrinkles_fine_lines": { "score": <0-10>, "note": "<forehead lines, crow's feet, nasolabial folds — depth>", "confidence": "<high|medium|low>" },
+            "skin_firmness_sagging": { "score": <0-10>, "note": "<jowl definition, jawline sharpness, skin laxity>", "confidence": "<high|medium|low>" },
+            "sun_damage": { "score": <0-10>, "note": "<photoaging, freckling, leathery texture>", "confidence": "<high|medium|low>" },
+            "skin_type_estimate": { "score": <0-10>, "note": "<oily/dry/combo/normal inferred from visible cues>", "confidence": "<high|medium|low>" },
+            "inflammation_zones": { "score": <0-10>, "note": "<perioral dermatitis, eczema patches, irritation around nose/mouth>", "confidence": "<high|medium|low>" },
+            "skin_radiance": { "score": <0-10>, "note": "<overall luminosity, dullness, healthy glow vs sallow>", "confidence": "<high|medium|low>" },
+            "moles_lesions": { "score": <0-10>, "note": "<visible moles — ABCD screening, concerning features>", "confidence": "<high|medium|low>" }
+          },
+          "hair": {
+            "frizz_level": { "score": <0-10>, "note": "<flyaways, halo frizz, smoothness>", "confidence": "<high|medium|low>" },
+            "shine_lustre": { "score": <0-10>, "note": "<light reflection, cuticle health indicators>", "confidence": "<high|medium|low>" },
+            "density_thinning": { "score": <0-10>, "note": "<scalp visibility, hairline recession, temple thinning>", "confidence": "<high|medium|low>" },
+            "dryness_brittleness": { "score": <0-10>, "note": "<split ends, straw-like texture, rough appearance>", "confidence": "<high|medium|low>" },
+            "scalp_condition": { "score": <0-10>, "note": "<flaking, dandruff, seborrheic dermatitis, redness at part>", "confidence": "<high|medium|low>" },
+            "hair_damage": { "score": <0-10>, "note": "<heat/chemical damage, breakage pattern>", "confidence": "<high|medium|low>" },
+            "volume_body": { "score": <0-10>, "note": "<limp/flat vs full/voluminous, root lift>", "confidence": "<high|medium|low>" },
+            "curl_wave_pattern": { "score": <0-10>, "note": "<curl type 2A-4C, definition, uniformity>", "confidence": "<high|medium|low>" },
+            "graying_pattern": { "score": <0-10>, "note": "<percentage gray, distribution — temples, crown, scattered>", "confidence": "<high|medium|low>" },
+            "styling_grooming": { "score": <0-10>, "note": "<overgrown, unstyled, well-maintained, neatness of cut>", "confidence": "<high|medium|low>" }
+          },
+          "lips": {
+            "dryness_chapping": { "score": <0-10>, "note": "<cracking, peeling, dehydration lines>", "confidence": "<high|medium|low>" },
+            "colour_pigmentation": { "score": <0-10>, "note": "<natural colour, hyperpigmentation, pallor>", "confidence": "<high|medium|low>" },
+            "angular_cheilitis": { "score": <0-10>, "note": "<cracking/redness at mouth corners>", "confidence": "<high|medium|low>" },
+            "lip_texture_smoothness": { "score": <0-10>, "note": "<surface quality, roughness, bumps>", "confidence": "<high|medium|low>" },
+            "vermilion_border_definition": { "score": <0-10>, "note": "<lip line sharpness, Cupid's bow clarity>", "confidence": "<high|medium|low>" },
+            "swelling_inflammation": { "score": <0-10>, "note": "<puffiness, asymmetric swelling>", "confidence": "<high|medium|low>" },
+            "hydration_level": { "score": <0-10>, "note": "<plumpness, suppleness>", "confidence": "<high|medium|low>" }
+          },
+          "under_eye": {
+            "dark_circles": { "score": <0-10>, "note": "<colour type (purple/brown/blue), severity, hollowing vs pigmentation>", "confidence": "<high|medium|low>" },
+            "puffiness_eye_bags": { "score": <0-10>, "note": "<swelling, fluid retention, fat pad herniation>", "confidence": "<high|medium|low>" },
+            "crows_feet_wrinkles": { "score": <0-10>, "note": "<fine lines from outer eye, depth and count>", "confidence": "<high|medium|low>" },
+            "tear_trough_depth": { "score": <0-10>, "note": "<hollowing between eyelid and cheek, shadow severity>", "confidence": "<high|medium|low>" }
+          },
+          "facial_hair": {
+            "pseudofolliculitis_barbae": { "score": <0-10>, "note": "<ingrown hairs, razor bumps, irritation in shave zone>", "confidence": "<high|medium|low>" },
+            "beard_stubble_condition": { "score": <0-10>, "note": "<patchiness, density, growth uniformity, grooming quality>", "confidence": "<high|medium|low>" }
+          },
+          "eyebrows": {
+            "eyebrow_grooming": { "score": <0-10>, "note": "<shape, fullness, symmetry, stray hairs>", "confidence": "<high|medium|low>" }
+          },
+          "eye_area": {
+            "upper_eyelid_exposure": { "score": <0-10>, "note": "<hooded vs exposed upper lid, lid droop>", "confidence": "<high|medium|low>" },
+            "canthal_tilt": { "score": <0-10>, "note": "<positive/neutral/negative eye angle>", "confidence": "<high|medium|low>" },
+            "orbital_hollowness": { "score": <0-10>, "note": "<sunken vs full periorbital area>", "confidence": "<high|medium|low>" },
+            "brow_position": { "score": <0-10>, "note": "<height, brow ridge prominence>", "confidence": "<high|medium|low>" }
+          },
+          "teeth": {
+            "teeth_alignment": { "score": <0-10>, "note": "<crowding, gaps, crookedness — from smile photo>", "confidence": "<high|medium|low>" },
+            "teeth_whiteness": { "score": <0-10>, "note": "<staining, yellowing, brightness — from smile photo>", "confidence": "<high|medium|low>" },
+            "smile_symmetry": { "score": <0-10>, "note": "<even vs uneven smile line — from smile photo>", "confidence": "<high|medium|low>" },
+            "gum_tooth_ratio": { "score": <0-10>, "note": "<gummy smile assessment — from smile photo>", "confidence": "<high|medium|low>" }
+          },
+          "nose": {
+            "nose_skin_quality": { "score": <0-10>, "note": "<blackheads, enlarged pores, oiliness on nose>", "confidence": "<high|medium|low>" },
+            "nose_proportion": { "score": <0-10>, "note": "<width, bridge height, nostril visibility, balance>", "confidence": "<high|medium|low>" }
+          },
+          "facial_structure": {
+            "jawline_definition": { "score": <0-10>, "note": "<sharpness, angle, double chin presence>", "confidence": "<high|medium|low>" },
+            "cheekbone_prominence": { "score": <0-10>, "note": "<zygomatic projection, hollowness below>", "confidence": "<high|medium|low>" },
+            "facial_symmetry": { "score": <0-10>, "note": "<left/right balance across features>", "confidence": "<high|medium|low>" },
+            "facial_fat_bloating": { "score": <0-10>, "note": "<puffiness, water retention, moon face>", "confidence": "<high|medium|low>" },
+            "chin_projection": { "score": <0-10>, "note": "<profile position, recessed vs proportional>", "confidence": "<high|medium|low>" },
+            "facial_thirds_balance": { "score": <0-10>, "note": "<upper/middle/lower facial proportions>", "confidence": "<high|medium|low>" },
+            "facial_width_ratio": { "score": <0-10>, "note": "<FWHR, overall face shape balance>", "confidence": "<high|medium|low>" }
+          },
+          "neck_posture": {
+            "forward_head_posture": { "score": <0-10>, "note": "<head position relative to shoulders — from side photos>", "confidence": "<high|medium|low>" },
+            "neck_definition": { "score": <0-10>, "note": "<jaw-to-neck angle, submental fat — from side photos>", "confidence": "<high|medium|low>" },
+            "neck_skin_quality": { "score": <0-10>, "note": "<tech neck lines, laxity, creasing>", "confidence": "<high|medium|low>" }
+          },
+          "overall_impression": {
+            "perceived_age": { "score": <0-10>, "note": "<looks older/younger than expected, aging indicators>", "confidence": "<high|medium|low>" },
+            "overall_grooming": { "score": <0-10>, "note": "<general put-together-ness, neatness>", "confidence": "<high|medium|low>" },
+            "facial_hydration": { "score": <0-10>, "note": "<overall plumpness vs dehydrated, skin turgor>", "confidence": "<high|medium|low>" }
+          }
         }
 
         Return ONLY valid JSON. No markdown, no explanation outside the JSON.
@@ -366,7 +445,7 @@ final class BackendAPIClient {
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": userContent]
             ],
-            "max_tokens": 1500,
+            "max_tokens": 5500,
             "response_format": ["type": "json_object"]
         ]
 
@@ -378,7 +457,7 @@ final class BackendAPIClient {
             throw APIError.noAPIKey
         }
 
-        let introText = "Here are 3 photos (front, left, right) of a man's face and hair. Analyze skin, hair, and facial hair health. Generate personalized routines for all three categories."
+        let introText = "Here are 4 photos (front, left, right, smile) of a man's face and hair. Analyze all visible features comprehensively. The smile photo shows teeth — use it for teeth/smile assessment. Generate personalized routines."
 
         var userContent: [[String: Any]] = [
             ["type": "text", "text": introText]
@@ -393,29 +472,120 @@ final class BackendAPIClient {
         }
 
         let systemPrompt = """
-        You are a board-certified dermatologist and licensed trichologist consulting with a male patient. You have HIGH STANDARDS and give evidence-based recommendations. Analyze the photos for skin, hair, and facial hair/stubble health.
+        You are a board-certified dermatologist and licensed trichologist consulting with a male patient. Scores reflect this person's own skin health potential — how close each area is to its personal best, not a comparison with others. A 6/10 means there's clear room for improvement with the right routine. An 8/10 means this area is well-maintained. Give evidence-based recommendations.
+
+        Cross-reference all 4 angles (front, left, right, smile). Analyze skin, hair, lips, under-eye area, eye area, teeth/smile, nose, facial hair, eyebrows, facial structure, neck/posture, and overall impression.
+
+        The smile photo shows teeth. Use it for teeth alignment, whiteness, smile symmetry, and gum-to-tooth ratio.
+
+        SCORING GUIDANCE:
+        - 8-10: This area is well-maintained. Minor refinements at most.
+        - 6-7: Healthy baseline with room to improve through consistent care.
+        - 4-5: Noticeable room for improvement. A good routine will help.
+        - 1-3: This area would benefit most from focused attention.
+        - Be SPECIFIC in notes — mention exact locations and what to look for.
+        - Frame observations as opportunities, not problems.
+        - Include "confidence": "high"|"medium"|"low" for each category based on how clearly visible it is in the photos.
 
         Return a JSON object with two sections:
 
         {
           "skinAnalysis": {
-            "overallScore": <0-100, most people 40-65>,
-            "summary": "<2-3 sentences. Be direct and clinical.>",
-            "acne": { "score": <0-10>, "note": "<exact locations and severity>" },
-            "texture": { "score": <0-10>, "note": "<pore size, roughness, scarring>" },
-            "hydration": { "score": <0-10>, "note": "<dehydration signs, barrier health>" },
-            "darkCircles": { "score": <0-10>, "note": "<pigmentation vs vascular>" },
-            "redness": { "score": <0-10>, "note": "<rosacea indicators, irritation>" },
-            "skinTone": { "score": <0-10>, "note": "<evenness, hyperpigmentation>" },
-            "skinType": "<oily/dry/combination/normal/sensitive>",
-            "faceShape": "<oval/round/square/oblong/heart/diamond/triangle>",
-            "hairOverall": { "score": <0-10>, "note": "<overall hair health>" },
-            "hairline": { "score": <0-10>, "note": "<recession pattern, density>" },
-            "hairThickness": { "score": <0-10>, "note": "<caliber, volume>" },
-            "hairCondition": { "score": <0-10>, "note": "<damage, porosity, dryness>" },
-            "scalpHealth": { "score": <0-10>, "note": "<flaking, irritation, buildup>" },
-            "hairType": "<straight/wavy/curly/coily>",
-            "recommendations": "<3-5 bullet points with clinical reasoning>"
+            "overallScore": <0-100 integer reflecting personal potential>,
+            "summary": "<2-3 sentences. Frame as current state and opportunity, not criticism.>",
+            "skinType": "<oily|dry|combination|normal|sensitive>",
+            "faceShape": "<oval|round|square|oblong|heart|diamond|triangle>",
+            "hairType": "<straight|wavy|curly|coily>",
+            "leftSideNote": "<1-2 sentences on left profile specifics>",
+            "rightSideNote": "<1-2 sentences on right profile specifics>",
+            "recommendations": "<3-5 specific product/ingredient suggestions as bullet points separated by newlines>",
+            "skin": {
+              "active_acne": { "score": <0-10>, "note": "<papules, pustules, cysts, whiteheads, blackheads — type, count, locations>", "confidence": "<high|medium|low>" },
+              "acne_scars_pih": { "score": <0-10>, "note": "<PIH, ice-pick, rolling, boxcar scars — location and severity>", "confidence": "<high|medium|low>" },
+              "redness_erythema": { "score": <0-10>, "note": "<diffuse redness, broken capillaries, rosacea indicators>", "confidence": "<high|medium|low>" },
+              "oiliness_shine": { "score": <0-10>, "note": "<T-zone shine, overall sebum levels>", "confidence": "<high|medium|low>" },
+              "pore_visibility": { "score": <0-10>, "note": "<enlarged pores, congestion — nose, cheeks, forehead>", "confidence": "<high|medium|low>" },
+              "skin_texture": { "score": <0-10>, "note": "<smoothness, roughness, bumps, KP, milia>", "confidence": "<high|medium|low>" },
+              "hyperpigmentation": { "score": <0-10>, "note": "<melasma, sun spots, age spots, dark patches>", "confidence": "<high|medium|low>" },
+              "skin_tone_evenness": { "score": <0-10>, "note": "<colour uniformity, blotchiness, discolouration>", "confidence": "<high|medium|low>" },
+              "dryness_flakiness": { "score": <0-10>, "note": "<peeling, flaking, dry patches, dehydration lines>", "confidence": "<high|medium|low>" },
+              "wrinkles_fine_lines": { "score": <0-10>, "note": "<forehead lines, crow's feet, nasolabial folds — depth>", "confidence": "<high|medium|low>" },
+              "skin_firmness_sagging": { "score": <0-10>, "note": "<jowl definition, jawline sharpness, skin laxity>", "confidence": "<high|medium|low>" },
+              "sun_damage": { "score": <0-10>, "note": "<photoaging, freckling, leathery texture>", "confidence": "<high|medium|low>" },
+              "skin_type_estimate": { "score": <0-10>, "note": "<oily/dry/combo/normal inferred from visible cues>", "confidence": "<high|medium|low>" },
+              "inflammation_zones": { "score": <0-10>, "note": "<perioral dermatitis, eczema patches, irritation around nose/mouth>", "confidence": "<high|medium|low>" },
+              "skin_radiance": { "score": <0-10>, "note": "<overall luminosity, dullness, healthy glow vs sallow>", "confidence": "<high|medium|low>" },
+              "moles_lesions": { "score": <0-10>, "note": "<visible moles — ABCD screening, concerning features>", "confidence": "<high|medium|low>" }
+            },
+            "hair": {
+              "frizz_level": { "score": <0-10>, "note": "<flyaways, halo frizz, smoothness>", "confidence": "<high|medium|low>" },
+              "shine_lustre": { "score": <0-10>, "note": "<light reflection, cuticle health indicators>", "confidence": "<high|medium|low>" },
+              "density_thinning": { "score": <0-10>, "note": "<scalp visibility, hairline recession, temple thinning>", "confidence": "<high|medium|low>" },
+              "dryness_brittleness": { "score": <0-10>, "note": "<split ends, straw-like texture, rough appearance>", "confidence": "<high|medium|low>" },
+              "scalp_condition": { "score": <0-10>, "note": "<flaking, dandruff, seborrheic dermatitis, redness at part>", "confidence": "<high|medium|low>" },
+              "hair_damage": { "score": <0-10>, "note": "<heat/chemical damage, breakage pattern>", "confidence": "<high|medium|low>" },
+              "volume_body": { "score": <0-10>, "note": "<limp/flat vs full/voluminous, root lift>", "confidence": "<high|medium|low>" },
+              "curl_wave_pattern": { "score": <0-10>, "note": "<curl type 2A-4C, definition, uniformity>", "confidence": "<high|medium|low>" },
+              "graying_pattern": { "score": <0-10>, "note": "<percentage gray, distribution — temples, crown, scattered>", "confidence": "<high|medium|low>" },
+              "styling_grooming": { "score": <0-10>, "note": "<overgrown, unstyled, well-maintained, neatness of cut>", "confidence": "<high|medium|low>" }
+            },
+            "lips": {
+              "dryness_chapping": { "score": <0-10>, "note": "<cracking, peeling, dehydration lines>", "confidence": "<high|medium|low>" },
+              "colour_pigmentation": { "score": <0-10>, "note": "<natural colour, hyperpigmentation, pallor>", "confidence": "<high|medium|low>" },
+              "angular_cheilitis": { "score": <0-10>, "note": "<cracking/redness at mouth corners>", "confidence": "<high|medium|low>" },
+              "lip_texture_smoothness": { "score": <0-10>, "note": "<surface quality, roughness, bumps>", "confidence": "<high|medium|low>" },
+              "vermilion_border_definition": { "score": <0-10>, "note": "<lip line sharpness, Cupid's bow clarity>", "confidence": "<high|medium|low>" },
+              "swelling_inflammation": { "score": <0-10>, "note": "<puffiness, asymmetric swelling>", "confidence": "<high|medium|low>" },
+              "hydration_level": { "score": <0-10>, "note": "<plumpness, suppleness>", "confidence": "<high|medium|low>" }
+            },
+            "under_eye": {
+              "dark_circles": { "score": <0-10>, "note": "<colour type (purple/brown/blue), severity, hollowing vs pigmentation>", "confidence": "<high|medium|low>" },
+              "puffiness_eye_bags": { "score": <0-10>, "note": "<swelling, fluid retention, fat pad herniation>", "confidence": "<high|medium|low>" },
+              "crows_feet_wrinkles": { "score": <0-10>, "note": "<fine lines from outer eye, depth and count>", "confidence": "<high|medium|low>" },
+              "tear_trough_depth": { "score": <0-10>, "note": "<hollowing between eyelid and cheek, shadow severity>", "confidence": "<high|medium|low>" }
+            },
+            "facial_hair": {
+              "pseudofolliculitis_barbae": { "score": <0-10>, "note": "<ingrown hairs, razor bumps, irritation in shave zone>", "confidence": "<high|medium|low>" },
+              "beard_stubble_condition": { "score": <0-10>, "note": "<patchiness, density, growth uniformity, grooming quality>", "confidence": "<high|medium|low>" }
+            },
+            "eyebrows": {
+              "eyebrow_grooming": { "score": <0-10>, "note": "<shape, fullness, symmetry, stray hairs>", "confidence": "<high|medium|low>" }
+            },
+            "eye_area": {
+              "upper_eyelid_exposure": { "score": <0-10>, "note": "<hooded vs exposed upper lid, lid droop>", "confidence": "<high|medium|low>" },
+              "canthal_tilt": { "score": <0-10>, "note": "<positive/neutral/negative eye angle>", "confidence": "<high|medium|low>" },
+              "orbital_hollowness": { "score": <0-10>, "note": "<sunken vs full periorbital area>", "confidence": "<high|medium|low>" },
+              "brow_position": { "score": <0-10>, "note": "<height, brow ridge prominence>", "confidence": "<high|medium|low>" }
+            },
+            "teeth": {
+              "teeth_alignment": { "score": <0-10>, "note": "<crowding, gaps, crookedness — from smile photo>", "confidence": "<high|medium|low>" },
+              "teeth_whiteness": { "score": <0-10>, "note": "<staining, yellowing, brightness — from smile photo>", "confidence": "<high|medium|low>" },
+              "smile_symmetry": { "score": <0-10>, "note": "<even vs uneven smile line — from smile photo>", "confidence": "<high|medium|low>" },
+              "gum_tooth_ratio": { "score": <0-10>, "note": "<gummy smile assessment — from smile photo>", "confidence": "<high|medium|low>" }
+            },
+            "nose": {
+              "nose_skin_quality": { "score": <0-10>, "note": "<blackheads, enlarged pores, oiliness on nose>", "confidence": "<high|medium|low>" },
+              "nose_proportion": { "score": <0-10>, "note": "<width, bridge height, nostril visibility, balance>", "confidence": "<high|medium|low>" }
+            },
+            "facial_structure": {
+              "jawline_definition": { "score": <0-10>, "note": "<sharpness, angle, double chin presence>", "confidence": "<high|medium|low>" },
+              "cheekbone_prominence": { "score": <0-10>, "note": "<zygomatic projection, hollowness below>", "confidence": "<high|medium|low>" },
+              "facial_symmetry": { "score": <0-10>, "note": "<left/right balance across features>", "confidence": "<high|medium|low>" },
+              "facial_fat_bloating": { "score": <0-10>, "note": "<puffiness, water retention, moon face>", "confidence": "<high|medium|low>" },
+              "chin_projection": { "score": <0-10>, "note": "<profile position, recessed vs proportional>", "confidence": "<high|medium|low>" },
+              "facial_thirds_balance": { "score": <0-10>, "note": "<upper/middle/lower facial proportions>", "confidence": "<high|medium|low>" },
+              "facial_width_ratio": { "score": <0-10>, "note": "<FWHR, overall face shape balance>", "confidence": "<high|medium|low>" }
+            },
+            "neck_posture": {
+              "forward_head_posture": { "score": <0-10>, "note": "<head position relative to shoulders — from side photos>", "confidence": "<high|medium|low>" },
+              "neck_definition": { "score": <0-10>, "note": "<jaw-to-neck angle, submental fat — from side photos>", "confidence": "<high|medium|low>" },
+              "neck_skin_quality": { "score": <0-10>, "note": "<tech neck lines, laxity, creasing>", "confidence": "<high|medium|low>" }
+            },
+            "overall_impression": {
+              "perceived_age": { "score": <0-10>, "note": "<looks older/younger than expected, aging indicators>", "confidence": "<high|medium|low>" },
+              "overall_grooming": { "score": <0-10>, "note": "<general put-together-ness, neatness>", "confidence": "<high|medium|low>" },
+              "facial_hydration": { "score": <0-10>, "note": "<overall plumpness vs dehydrated, skin turgor>", "confidence": "<high|medium|low>" }
+            }
           },
           "routines": [
             {
@@ -481,7 +651,7 @@ final class BackendAPIClient {
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": userContent]
             ],
-            "max_tokens": 4000,
+            "max_tokens": 6000,
             "response_format": ["type": "json_object"]
         ]
 

@@ -157,18 +157,42 @@ struct ProgressPhotoCompareView: View {
 
             Divider()
 
-            // Per-category
-            let beforeCats = before.userFacingCategories
-            let afterCats = after.userFacingCategories
-            ForEach(Array(zip(beforeCats, afterCats)), id: \.0.id) { bCat, aCat in
-                HStack {
-                    Image(systemName: bCat.icon)
-                        .font(.caption)
-                        .frame(width: 18)
-                    Text(bCat.name)
-                        .font(.caption)
-                    Spacer()
-                    scoreDelta(before: bCat.score, after: aCat.score)
+            // Per-group comparison
+            let beforeGroups = before.displayGroups
+            let afterGroups = after.displayGroups
+
+            ForEach(beforeGroups) { bGroup in
+                if let aGroup = afterGroups.first(where: { $0.id == bGroup.id }) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        // Group header
+                        HStack {
+                            Image(systemName: bGroup.icon)
+                                .font(.caption)
+                                .frame(width: 18)
+                            Text(bGroup.label)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            scoreDelta(
+                                before: Int(bGroup.averageScore.rounded()),
+                                after: Int(aGroup.averageScore.rounded())
+                            )
+                        }
+
+                        // Individual categories within group
+                        ForEach(bGroup.entries) { bEntry in
+                            if let aEntry = aGroup.entries.first(where: { $0.id == bEntry.id }) {
+                                HStack {
+                                    Text(bEntry.label)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    scoreDelta(before: bEntry.score, after: aEntry.score)
+                                }
+                                .padding(.leading, 26)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -194,7 +218,7 @@ struct ProgressPhotoCompareView: View {
                 Text(delta > 0 ? "+\(delta)" : "\(delta)")
                     .font(.caption2)
                     .fontWeight(.bold)
-                    .foregroundStyle(delta > 0 ? .green : .red)
+                    .foregroundStyle(delta > 0 ? .teal : .secondary)
             }
         }
     }
