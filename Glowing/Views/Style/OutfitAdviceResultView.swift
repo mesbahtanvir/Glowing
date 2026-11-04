@@ -88,7 +88,9 @@ struct OutfitAdviceResultView: View {
                         .lineLimit(2)
                 }
 
-                if let alignment = advice.goalAlignment {
+                // Only meaningful against a goal the user can see. The prompt asks for null without one,
+                // but a model can ignore that.
+                if goal != nil, let alignment = advice.goalAlignment {
                     alignmentPill(alignment)
                 }
             }

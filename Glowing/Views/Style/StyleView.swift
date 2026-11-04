@@ -86,7 +86,9 @@ struct StyleView: View {
 
     @ViewBuilder
     private var photoSection: some View {
-        if let image = viewModel.previewImage {
+        if viewModel.isLoadingPhoto {
+            photoLoading
+        } else if let image = viewModel.previewImage {
             VStack(spacing: 10) {
                 Image(uiImage: image)
                     .resizable()
@@ -121,6 +123,21 @@ struct StyleView: View {
         } else {
             photoPlaceholder
         }
+    }
+
+    /// Shown while a photo is fetched, which can take a few seconds for photos stored in iCloud.
+    private var photoLoading: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+            Text("Opening your photo...")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 56)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .combine)
     }
 
     private var photoPlaceholder: some View {
@@ -277,22 +294,16 @@ struct StyleView: View {
     // MARK: - Photo Intake
 
     private func handleCaptured(_ image: UIImage) {
-        guard let data = image.jpegData(compressionQuality: 0.9) else {
-            viewModel.reportPhotoFailure()
-            return
+        Task {
+            await viewModel.loadPhoto { image.jpegData(compressionQuality: 0.9) }
         }
-        Task { await viewModel.loadPhoto(rawData: data) }
     }
 
     private func loadPickedPhoto(_ item: PhotosPickerItem) async {
         // Clear the selection afterwards so picking the same photo again still registers.
         defer { pickerItem = nil }
 
-        guard let data = try? await item.loadTransferable(type: Data.self) else {
-            viewModel.reportPhotoFailure()
-            return
-        }
-        await viewModel.loadPhoto(rawData: data)
+        await viewModel.loadPhoto { try? await item.loadTransferable(type: Data.self) }
     }
 }
 

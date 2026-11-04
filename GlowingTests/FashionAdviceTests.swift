@@ -47,6 +47,7 @@ private func itemJSON(
     """
 }
 
+@MainActor
 private func sampleAdvice(summary: String = "Looks good.") -> OutfitAdvice {
     OutfitAdvice(
         detectedStyle: "casual",
@@ -136,6 +137,21 @@ struct StyleGoalTests {
         let text = StyleGoal(long)?.text ?? ""
         #expect(text.count == StyleGoal.maxLength)
         #expect(text.allSatisfy { $0 == "👗" })
+    }
+
+    @Test func keepsTheJoinersThatEmojiAndScriptsDependOn() {
+        // A family emoji is three emoji joined by U+200D.
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"
+        #expect(StyleGoal("Family \(family) brunch")?.text == "Family \(family) brunch")
+
+        // Persian writes some words with U+200C (zero-width non-joiner).
+        let persian = "\u{0645}\u{06CC}\u{200C}\u{062E}\u{0648}\u{0627}\u{0647}\u{0645}"
+        #expect(StyleGoal(persian)?.text == persian)
+    }
+
+    @Test func removesInvisibleTagCharacters() {
+        // U+E0041 and U+E0042 are invisible "tag" letters. Pasted into a goal, they could carry hidden text.
+        #expect(StyleGoal("Date\u{E0041}\u{E0042} night")?.text == "Date night")
     }
 
     @Test func suggestionsAreValidGoalsAndUnique() {
@@ -631,5 +647,92 @@ struct OutfitAdviceViewModelTests {
         viewModel.removePhoto()
         #expect(!viewModel.hasPhoto)
         #expect(!viewModel.canAnalyze)
+    }
+
+    // MARK: Photo loading
+
+    @Test func loadingAPhotoShrinksItAndShowsIt() async {
+        let viewModel = OutfitAdviceViewModel(advisor: StubAdvisor(.success(sampleAdvice())))
+        let large = makeJPEG(width: 2000, height: 1000)
+
+        await viewModel.loadPhoto { large }
+
+        #expect(viewModel.hasPhoto)
+        #expect(!viewModel.isLoadingPhoto)
+        #expect(viewModel.notice == nil)
+        let properties = viewModel.photoJPEG.flatMap(imageProperties(of:))
+        let width = properties?[kCGImagePropertyPixelWidth] as? Int ?? 0
+        #expect(width > 0 && width <= 1280)
+    }
+
+    @Test func anUnreadablePhotoKeepsTheCurrentOneAndExplains() async {
+        let viewModel = makeViewModel(StubAdvisor(.success(sampleAdvice())))
+
+        await viewModel.loadPhoto { Data("not an image".utf8) }
+
+        #expect(viewModel.photoJPEG == photo)
+        #expect(viewModel.notice?.kind == .error)
+        #expect(!viewModel.isLoadingPhoto)
+    }
+
+    @Test func aPhotoThatCannotBeFetchedIsReported() async {
+        let viewModel = OutfitAdviceViewModel(advisor: StubAdvisor(.success(sampleAdvice())))
+
+        await viewModel.loadPhoto { nil }
+
+        #expect(!viewModel.hasPhoto)
+        #expect(viewModel.notice?.kind == .error)
+        #expect(!viewModel.isLoadingPhoto)
+    }
+
+    @Test func analysisWaitsForAPhotoThatIsStillLoading() {
+        let viewModel = makeViewModel(StubAdvisor(.success(sampleAdvice())))
+
+        let ticket = viewModel.beginPhotoLoad()
+        #expect(viewModel.isLoadingPhoto)
+        #expect(!viewModel.canAnalyze)
+        #expect(viewModel.analyze() == nil)
+
+        viewModel.finishPhotoLoad(ticket: ticket, preparedJPEG: photo)
+        #expect(!viewModel.isLoadingPhoto)
+        #expect(viewModel.canAnalyze)
+    }
+
+    @Test func aNewerPhotoLoadWinsOverAnOlderOne() {
+        let viewModel = OutfitAdviceViewModel(advisor: StubAdvisor(.success(sampleAdvice())))
+        let older = viewModel.beginPhotoLoad()
+        let newer = viewModel.beginPhotoLoad()
+
+        viewModel.finishPhotoLoad(ticket: newer, preparedJPEG: photo)
+        // The slower, older load finishes last and must not overwrite the newer photo.
+        viewModel.finishPhotoLoad(ticket: older, preparedJPEG: makeJPEG(width: 32, height: 32))
+
+        #expect(viewModel.photoJPEG == photo)
+        #expect(!viewModel.isLoadingPhoto)
+    }
+
+    @Test func removingThePhotoAbandonsALoadInFlight() {
+        let viewModel = makeViewModel(StubAdvisor(.success(sampleAdvice())))
+        let ticket = viewModel.beginPhotoLoad()
+
+        viewModel.removePhoto()
+        viewModel.finishPhotoLoad(ticket: ticket, preparedJPEG: makeJPEG(width: 32, height: 32))
+
+        #expect(!viewModel.hasPhoto)
+        #expect(!viewModel.isLoadingPhoto)
+    }
+
+    @Test func aLateLoadCannotSwapThePhotoBeingAnalyzed() async {
+        let viewModel = makeViewModel(SuspendingAdvisor())
+        let task = viewModel.analyze()
+        #expect(viewModel.phase == .analyzing)
+
+        // The UI can't start a load during analysis, but the guard shouldn't depend on that.
+        let ticket = viewModel.beginPhotoLoad()
+        viewModel.finishPhotoLoad(ticket: ticket, preparedJPEG: makeJPEG(width: 32, height: 32))
+        #expect(viewModel.photoJPEG == photo)
+
+        viewModel.cancelAnalysis()
+        await task?.value
     }
 }

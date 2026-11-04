@@ -42,12 +42,18 @@ final class OutfitAdviceViewModel {
     /// The same photo, decoded once for display.
     private(set) var previewImage: UIImage?
     private(set) var notice: Notice?
+    /// True while a photo is being fetched or shrunk. Analysis waits for it, so the photo on screen
+    /// is the photo that gets analysed.
+    private(set) var isLoadingPhoto = false
 
     /// The goal as typed. Bound to the text field.
     var goalText: String = ""
 
     private let advisor: any OutfitAdvising
     @ObservationIgnored private var analysisTask: Task<Void, Never>?
+    /// Bumped whenever a photo load starts or is abandoned, so a slow load that has been
+    /// superseded can't land late and overwrite newer state.
+    @ObservationIgnored private var photoLoadTicket = 0
 
     init(advisor: any OutfitAdvising = BackendAPIClient.shared) {
         self.advisor = advisor
@@ -60,7 +66,7 @@ final class OutfitAdviceViewModel {
 
     var hasPhoto: Bool { photoJPEG != nil }
 
-    var canAnalyze: Bool { hasPhoto && phase == .composing }
+    var canAnalyze: Bool { hasPhoto && !isLoadingPhoto && phase == .composing }
 
     // MARK: - Photo
 
@@ -75,28 +81,57 @@ final class OutfitAdviceViewModel {
         notice = nil
     }
 
-    /// Accepts a photo straight from the camera or library: shrinks it off the main thread, then sets it.
-    func loadPhoto(rawData: Data) async {
-        let prepared = await Task.detached(priority: .userInitiated) {
-            OutfitImagePreparer.prepareJPEG(from: rawData)
-        }.value
+    /// Loads a photo from the camera or library. `fetch` returns the raw image data, or nil if it couldn't be
+    /// read, and may be slow (an iCloud download, say). The data is then shrunk off the main thread.
+    /// If the current photo can't be replaced, it is kept and a short notice explains.
+    func loadPhoto(fetch: () async -> Data?) async {
+        let ticket = beginPhotoLoad()
 
-        guard let prepared else {
+        var prepared: Data?
+        if let raw = await fetch() {
+            prepared = await Task.detached(priority: .userInitiated) {
+                OutfitImagePreparer.prepareJPEG(from: raw)
+            }.value
+        }
+
+        finishPhotoLoad(ticket: ticket, preparedJPEG: prepared)
+    }
+
+    /// Marks the start of a photo load and returns its ticket.
+    func beginPhotoLoad() -> Int {
+        photoLoadTicket += 1
+        isLoadingPhoto = true
+        notice = nil
+        return photoLoadTicket
+    }
+
+    /// Applies the outcome of a photo load, unless something newer has happened since `beginPhotoLoad`:
+    /// another load started, the photo was removed, or analysis began. `preparedJPEG` is nil when the
+    /// photo couldn't be read.
+    func finishPhotoLoad(ticket: Int, preparedJPEG: Data?) {
+        guard ticket == photoLoadTicket else { return }
+        isLoadingPhoto = false
+        // Once analysis has started, the photo being analysed stays put.
+        guard phase == .composing else { return }
+
+        guard let preparedJPEG else {
             notice = Notice(kind: .error, message: Self.unreadablePhotoMessage)
             return
         }
-        setPhoto(preparedJPEG: prepared)
-    }
-
-    /// For when a photo was chosen but couldn't be read at all.
-    func reportPhotoFailure() {
-        notice = Notice(kind: .error, message: Self.unreadablePhotoMessage)
+        setPhoto(preparedJPEG: preparedJPEG)
     }
 
     func removePhoto() {
+        abandonPhotoLoad()
         photoJPEG = nil
         previewImage = nil
         notice = nil
+    }
+
+    /// Makes any load still in flight stale.
+    private func abandonPhotoLoad() {
+        photoLoadTicket += 1
+        isLoadingPhoto = false
     }
 
     // MARK: - Analysis
