@@ -287,28 +287,15 @@ final class BackendAPIClient {
     /// The response is the JSON object described in `FashionAdvicePrompt.systemPrompt`, at the top level.
     /// Debug builds skip the backend and call the AI service directly, like the other analysis methods.
     func adviseOnOutfit(photoJPEG: Data, goal: StyleGoal?) async throws -> OutfitAdvice {
-        let json: [String: Any]
-
         if APIConfig.useMockBackend {
-            json = try await adviseOnOutfitDirect(photoJPEG: photoJPEG, goal: goal)
-        } else {
-            let url = APIConfig.baseURL.appendingPathComponent("analyze/outfit")
-            var body: [String: Any] = [
-                "images": [["angle": "outfit", "data": photoJPEG.base64EncodedString()]]
-            ]
-            if let goal {
-                body["goal"] = goal.text
-            }
-
-            let (data, _) = try await performRequest(url: url, body: body)
-
-            guard let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw APIError.invalidResponse
-            }
-            json = parsed
+            let json = try await adviseOnOutfitDirect(photoJPEG: photoJPEG, goal: goal)
+            return try OutfitAdvice.parse(json)
         }
 
-        return try OutfitAdvice.parse(json)
+        let url = APIConfig.baseURL.appendingPathComponent("analyze/outfit")
+        let body = OutfitAdviceRequest.backendBody(photoJPEG: photoJPEG, goal: goal)
+        let (data, _) = try await performRequest(url: url, body: body)
+        return try OutfitAdviceRequest.advice(fromBackendResponse: data)
     }
 
     private func adviseOnOutfitDirect(photoJPEG: Data, goal: StyleGoal?) async throws -> [String: Any] {
@@ -316,28 +303,7 @@ final class BackendAPIClient {
             throw APIError.noAPIKey
         }
 
-        let userContent: [[String: Any]] = [
-            ["type": "text", "text": FashionAdvicePrompt.userText(goal: goal)],
-            [
-                "type": "image_url",
-                // "high" detail so shoes, cuffs and accessories stay legible.
-                "image_url": [
-                    "url": "data:image/jpeg;base64,\(photoJPEG.base64EncodedString())",
-                    "detail": "high"
-                ]
-            ]
-        ]
-
-        let requestBody: [String: Any] = [
-            "model": "gpt-4o",
-            "messages": [
-                ["role": "system", "content": FashionAdvicePrompt.systemPrompt],
-                ["role": "user", "content": userContent]
-            ],
-            "max_tokens": 2500,
-            "response_format": ["type": "json_object"]
-        ]
-
+        let requestBody = OutfitAdviceRequest.chatCompletionBody(photoJPEG: photoJPEG, goal: goal)
         return try await callOpenAI(apiKey: apiKey, body: requestBody)
     }
 

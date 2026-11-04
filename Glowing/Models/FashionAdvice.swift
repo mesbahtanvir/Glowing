@@ -248,11 +248,13 @@ extension OutfitAdvice {
     // MARK: Helpers
 
     private static func parseItems(_ raw: Any?, kind: AdviceKind) -> [AdviceItem] {
-        guard let entries = raw as? [[String: Any]] else { return [] }
+        guard let values = raw as? [Any] else { return [] }
 
         var items: [AdviceItem] = []
-        for (index, entry) in entries.enumerated() {
-            guard let title = cleanedString(entry[AdviceItem.JSONKey.title.rawValue]),
+        for (index, value) in values.enumerated() {
+            // A stray string, number or null in the list costs only itself, never its neighbours.
+            guard let entry = value as? [String: Any],
+                  let title = cleanedString(entry[AdviceItem.JSONKey.title.rawValue]),
                   let suggestion = cleanedString(entry[AdviceItem.JSONKey.suggestion.rawValue]) else {
                 continue
             }

@@ -62,6 +62,16 @@ struct StyleGoal: Equatable, Sendable {
             result.removeLast()
         }
 
+        // Joiners and other format characters are kept inside text, but on their own they say nothing:
+        // a goal of just a zero-width space is no goal at all.
+        let hasVisibleText = result.unicodeScalars.contains { scalar in
+            let category = scalar.properties.generalCategory
+            return category != .format && category != .spaceSeparator
+        }
+        if !hasVisibleText {
+            return ""
+        }
+
         if result.count > maxLength {
             // Cut by Character so an emoji or accented letter is never split in half.
             result = String(result.prefix(maxLength)).trimmingCharacters(in: .whitespaces)

@@ -196,24 +196,24 @@ final class OutfitAdviceViewModel {
         if let adviceError = error as? OutfitAdviceError {
             switch adviceError {
             case .noOutfitVisible(let tip):
-                return Notice(
-                    kind: .photoTip,
-                    message: tip ?? "We couldn't see an outfit in this photo. Try one where your whole look is in frame."
-                )
+                return Notice(kind: .photoTip, message: tip ?? Self.noOutfitMessage)
             case .unusableResponse:
-                return Notice(kind: .error, message: "We couldn't put together advice this time. Please try again.")
+                return Notice(kind: .error, message: Self.unusableAdviceMessage)
             }
+        }
+
+        // The service answered, but not with anything we could read. Same story for the user as an
+        // empty answer, and friendlier than "Could not parse API response."
+        if let apiError = error as? BackendAPIClient.APIError, case .invalidResponse = apiError {
+            return Notice(kind: .error, message: Self.unusableAdviceMessage)
         }
 
         if let urlError = error as? URLError {
             switch urlError.code {
             case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
-                return Notice(
-                    kind: .error,
-                    message: "You appear to be offline. Your photo is still here, so you can try again when you're connected."
-                )
+                return Notice(kind: .error, message: Self.offlineMessage)
             case .timedOut:
-                return Notice(kind: .error, message: "That took longer than expected. Please try again in a moment.")
+                return Notice(kind: .error, message: Self.timedOutMessage)
             default:
                 break
             }
@@ -221,4 +221,9 @@ final class OutfitAdviceViewModel {
 
         return Notice(kind: .error, message: error.localizedDescription)
     }
+
+    static let noOutfitMessage = "We couldn't see an outfit in this photo. Try one where your whole look is in frame."
+    static let unusableAdviceMessage = "We couldn't put together advice this time. Please try again."
+    static let offlineMessage = "You appear to be offline. Your photo is still here, so you can try again when you're connected."
+    static let timedOutMessage = "That took longer than expected. Please try again in a moment."
 }
