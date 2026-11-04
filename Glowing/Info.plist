@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Glowing uses the camera to take progress photos that track your skin and grooming results over time.</string>
+	<string>Glowing uses the camera to take progress photos that track your skin and grooming results over time, and to photograph your outfits for style advice.</string>
 </dict>
 </plist>

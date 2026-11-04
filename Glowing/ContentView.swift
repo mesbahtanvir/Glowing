@@ -3,6 +3,7 @@ import SwiftData
 
 enum AppTab: String, CaseIterable {
     case today
+    case style
     case you
 }
 
@@ -13,6 +14,10 @@ struct ContentView: View {
         TabView(selection: $selectedTab) {
             Tab("Today", systemImage: "sparkles", value: .today) {
                 HomeView()
+            }
+
+            Tab("Style", systemImage: "tshirt", value: .style) {
+                StyleView()
             }
 
             Tab("You", systemImage: "person.crop.circle", value: .you) {

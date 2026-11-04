@@ -414,7 +414,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Glowing/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Glowing uses the camera to take progress photos that track your skin and grooming results over time.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Glowing uses the camera to take progress photos that track your skin and grooming results over time, and to photograph your outfits for style advice.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -463,7 +463,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Glowing/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Glowing uses the camera to take progress photos that track your skin and grooming results over time.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Glowing uses the camera to take progress photos that track your skin and grooming results over time, and to photograph your outfits for style advice.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
