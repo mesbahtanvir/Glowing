@@ -278,6 +278,35 @@ final class BackendAPIClient {
         return result["routines"] as? [[String: Any]] ?? []
     }
 
+    // MARK: - Outfit Advice
+
+    /// Analyzes an outfit photo and returns advice for the user's goal.
+    ///
+    /// Backend contract for release builds: `POST analyze/outfit` with
+    /// `{"images": [{"angle": "outfit", "data": "<base64 JPEG>"}], "goal": "<optional text>"}`.
+    /// The response is the JSON object described in `FashionAdvicePrompt.systemPrompt`, at the top level.
+    /// Debug builds skip the backend and call the AI service directly, like the other analysis methods.
+    func adviseOnOutfit(photoJPEG: Data, goal: StyleGoal?) async throws -> OutfitAdvice {
+        if APIConfig.useMockBackend {
+            let json = try await adviseOnOutfitDirect(photoJPEG: photoJPEG, goal: goal)
+            return try OutfitAdvice.parse(json)
+        }
+
+        let url = APIConfig.baseURL.appendingPathComponent("analyze/outfit")
+        let body = OutfitAdviceRequest.backendBody(photoJPEG: photoJPEG, goal: goal)
+        let (data, _) = try await performRequest(url: url, body: body)
+        return try OutfitAdviceRequest.advice(fromBackendResponse: data)
+    }
+
+    private func adviseOnOutfitDirect(photoJPEG: Data, goal: StyleGoal?) async throws -> [String: Any] {
+        guard let apiKey = KeychainHelper.read(key: "com.glowing.openai-api-key") else {
+            throw APIError.noAPIKey
+        }
+
+        let requestBody = OutfitAdviceRequest.chatCompletionBody(photoJPEG: photoJPEG, goal: goal)
+        return try await callOpenAI(apiKey: apiKey, body: requestBody)
+    }
+
     // MARK: - Backend HTTP Request
 
     private func performRequest(url: URL, body: [String: Any]) async throws -> (Data, URLResponse) {
@@ -718,3 +747,5 @@ final class BackendAPIClient {
         }
     }
 }
+
+extension BackendAPIClient: OutfitAdvising {}
