@@ -266,7 +266,7 @@ final class GatedAdvisor: OutfitAdvising {
         callCount += 1
         let name = goal?.text ?? "no goal"
         if name == "slow" && !isReleased {
-            await withCheckedContinuation { continuation in
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 gate = continuation
             }
         }

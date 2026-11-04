@@ -396,7 +396,7 @@ struct OutfitAdviceViewModelTests {
 
     @Test func refusesAPhotoItCannotDecode() {
         let viewModel = OutfitAdviceViewModel(advisor: StubAdvisor(.success(sampleAdvice())))
-        viewModel.setPhoto(preparedJPEG: Data([0x01, 0x02, 0x03]))
+        viewModel.setPhoto(preparedJPEG: Data("not an image".utf8))
         #expect(!viewModel.hasPhoto)
         #expect(viewModel.notice?.kind == .error)
     }

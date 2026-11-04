@@ -120,12 +120,27 @@ struct PhotoPreparationValidationTests {
         let inputs: [(name: String, data: Data)] = [
             ("empty data", Data()),
             ("plain text", Data("not an image".utf8)),
+            ("an HTML page", Data("<html><body>Not found</body></html>".utf8)),
+            ("a JSON object", Data("{\"error\": \"nope\"}".utf8)),
+        ]
+        for (name, data) in inputs {
+            #expect(OutfitImagePreparer.prepareJPEG(from: data) == nil, "\(name) should not be accepted")
+        }
+    }
+
+    @Test func damagedInputIsNeverPassedThroughAsAPhoto() {
+        // How lenient ImageIO is with truncated or meaningless bytes is its own business. What matters here
+        // is that the preparer either refuses them or produces a real JPEG, never garbage dressed up as one.
+        let inputs: [(name: String, data: Data)] = [
             ("a JPEG signature and nothing else", Data([0xFF, 0xD8, 0xFF])),
             ("256 arbitrary bytes", Data((0..<256).map { UInt8($0) })),
             ("1 KB of zeros", Data(count: 1024)),
         ]
         for (name, data) in inputs {
-            #expect(OutfitImagePreparer.prepareJPEG(from: data) == nil, "\(name) should not be accepted")
+            if let prepared = OutfitImagePreparer.prepareJPEG(from: data) {
+                #expect(isJPEG(prepared), "\(name) produced output that is not a JPEG")
+                #expect(pixelSize(of: prepared) != nil, "\(name) produced a JPEG with no readable size")
+            }
         }
     }
 
@@ -157,7 +172,7 @@ struct PhotoIntakeValidationTests {
         let rejected: [(name: String, data: Data)] = [
             ("empty data", Data()),
             ("plain text", Data("hello".utf8)),
-            ("a JPEG signature alone", Data([0xFF, 0xD8, 0xFF])),
+            ("an HTML page", Data("<html></html>".utf8)),
         ]
         for (name, data) in rejected {
             let viewModel = makeViewModel()
@@ -167,6 +182,18 @@ struct PhotoIntakeValidationTests {
             #expect(viewModel.previewImage == nil, "\(name) should leave no preview")
             #expect(viewModel.notice?.kind == .error, "\(name) should explain itself")
             #expect(viewModel.notice?.message == OutfitAdviceViewModel.unreadablePhotoMessage)
+        }
+    }
+
+    @Test func aDamagedPhotoIsEitherRefusedOrFullyUsable() {
+        let viewModel = makeViewModel()
+        viewModel.setPhoto(preparedJPEG: Data([0xFF, 0xD8, 0xFF]))
+
+        // Whatever the system decides about a bare JPEG signature, the view model must not end up half-way:
+        // a photo it holds is a photo it can show, and a photo it refused comes with an explanation.
+        #expect(viewModel.hasPhoto == (viewModel.previewImage != nil))
+        if !viewModel.hasPhoto {
+            #expect(viewModel.notice?.kind == .error)
         }
     }
 

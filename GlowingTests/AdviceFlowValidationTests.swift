@@ -232,54 +232,54 @@ struct AdviceFlowValidationTests {
 @Suite("Error message validation")
 struct ErrorMessageValidationTests {
 
-    private struct Expectation {
+    private struct NoticeCase {
         let name: String
         let error: Error
         let kind: OutfitAdviceViewModel.Notice.Kind
         let message: String
     }
 
-    private var expectations: [Expectation] {
+    private var noticeCases: [NoticeCase] {
         let unusable = OutfitAdviceViewModel.unusableAdviceMessage
-        var list: [Expectation] = [
-            Expectation(name: "no outfit, with a tip", error: OutfitAdviceError.noOutfitVisible(tip: "Step back."), kind: .photoTip, message: "Step back."),
-            Expectation(name: "no outfit, no tip", error: OutfitAdviceError.noOutfitVisible(tip: nil), kind: .photoTip, message: OutfitAdviceViewModel.noOutfitMessage),
-            Expectation(name: "nothing usable in the answer", error: OutfitAdviceError.unusableResponse, kind: .error, message: unusable),
-            Expectation(name: "an unreadable answer from the service", error: BackendAPIClient.APIError.invalidResponse, kind: .error, message: unusable),
-            Expectation(name: "a missing API key", error: BackendAPIClient.APIError.noAPIKey, kind: .error, message: BackendAPIClient.APIError.noAPIKey.localizedDescription),
-            Expectation(name: "an HTTP error", error: BackendAPIClient.APIError.httpError(503), kind: .error, message: "API error (HTTP 503)."),
-            Expectation(name: "a message from the service", error: BackendAPIClient.APIError.serverError("Rate limit reached"), kind: .error, message: "Rate limit reached"),
+        var list: [NoticeCase] = [
+            NoticeCase(name: "no outfit, with a tip", error: OutfitAdviceError.noOutfitVisible(tip: "Step back."), kind: .photoTip, message: "Step back."),
+            NoticeCase(name: "no outfit, no tip", error: OutfitAdviceError.noOutfitVisible(tip: nil), kind: .photoTip, message: OutfitAdviceViewModel.noOutfitMessage),
+            NoticeCase(name: "nothing usable in the answer", error: OutfitAdviceError.unusableResponse, kind: .error, message: unusable),
+            NoticeCase(name: "an unreadable answer from the service", error: BackendAPIClient.APIError.invalidResponse, kind: .error, message: unusable),
+            NoticeCase(name: "a missing API key", error: BackendAPIClient.APIError.noAPIKey, kind: .error, message: BackendAPIClient.APIError.noAPIKey.localizedDescription),
+            NoticeCase(name: "an HTTP error", error: BackendAPIClient.APIError.httpError(503), kind: .error, message: "API error (HTTP 503)."),
+            NoticeCase(name: "a message from the service", error: BackendAPIClient.APIError.serverError("Rate limit reached"), kind: .error, message: "Rate limit reached"),
         ]
 
         let offline: [URLError.Code] = [.notConnectedToInternet, .networkConnectionLost, .dataNotAllowed]
         for code in offline {
-            list.append(Expectation(name: "offline (\(code.rawValue))", error: URLError(code), kind: .error, message: OutfitAdviceViewModel.offlineMessage))
+            list.append(NoticeCase(name: "offline (\(code.rawValue))", error: URLError(code), kind: .error, message: OutfitAdviceViewModel.offlineMessage))
         }
-        list.append(Expectation(name: "a timeout", error: URLError(.timedOut), kind: .error, message: OutfitAdviceViewModel.timedOutMessage))
+        list.append(NoticeCase(name: "a timeout", error: URLError(.timedOut), kind: .error, message: OutfitAdviceViewModel.timedOutMessage))
 
         // Other network failures say what the system says.
         let other: [URLError.Code] = [.cannotFindHost, .cannotConnectToHost, .badServerResponse, .secureConnectionFailed, .cancelled]
         for code in other {
-            list.append(Expectation(name: "network error \(code.rawValue)", error: URLError(code), kind: .error, message: URLError(code).localizedDescription))
+            list.append(NoticeCase(name: "network error \(code.rawValue)", error: URLError(code), kind: .error, message: URLError(code).localizedDescription))
         }
 
         let generic = NSError(domain: "FashionTests", code: 7, userInfo: [NSLocalizedDescriptionKey: "Something specific broke."])
-        list.append(Expectation(name: "any other error", error: generic, kind: .error, message: "Something specific broke."))
+        list.append(NoticeCase(name: "any other error", error: generic, kind: .error, message: "Something specific broke."))
         return list
     }
 
     @Test func everyFailureHasTheRightKindAndMessage() {
-        for expectation in expectations {
-            let notice = OutfitAdviceViewModel.makeNotice(for: expectation.error)
-            #expect(notice.kind == expectation.kind, "\(expectation.name): wrong kind")
-            #expect(notice.message == expectation.message, "\(expectation.name): wrong message")
+        for noticeCase in noticeCases {
+            let notice = OutfitAdviceViewModel.makeNotice(for: noticeCase.error)
+            #expect(notice.kind == noticeCase.kind, "\(noticeCase.name): wrong kind")
+            #expect(notice.message == noticeCase.message, "\(noticeCase.name): wrong message")
         }
     }
 
     @Test func noMessageIsEverBlank() {
-        for expectation in expectations {
-            let message = OutfitAdviceViewModel.makeNotice(for: expectation.error).message
-            #expect(!message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "\(expectation.name) produced a blank message")
+        for noticeCase in noticeCases {
+            let message = OutfitAdviceViewModel.makeNotice(for: noticeCase.error).message
+            #expect(!message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "\(noticeCase.name) produced a blank message")
         }
     }
 
