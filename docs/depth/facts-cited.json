@@ -1,0 +1,478 @@
+{
+  "verified_on": "2026-11-06",
+  "note": "Claims cited by PLAN-DEPTH.md, copied unchanged from the research register.",
+  "claims": [
+    {
+      "id": "depth-capture:Q1-d",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "The LiDAR scanner is rear-only: the LiDAR depth device is obtained with AVCaptureDevice.default(.builtInLiDARDepthCamera, for: .video, position: .back) and pairs the scanner with the rear wide camera; the front depth sensor is the infrared TrueDepth camera ('two cameras, one Infrared and one YUV').",
+      "source": "https://developer.apple.com/documentation/avfoundation/capturing-depth-using-the-lidar-camera ; https://developer.apple.com/videos/play/wwdc2022/110429/ ; https://developer.apple.com/documentation/avfoundation/avcapturedevice/devicetype-swift.struct/builtintruedepthcamera",
+      "note": "Sample code (re-read): 'AVCaptureDevice.default(.builtInLiDARDepthCamera, for: .video, position: .back)'. WWDC22: 'This new AVCaptureDevice uses the rear-facing wide-angle camera to deliver video with the LiDAR Scanner to capture depth.' and 'Because the LiDAR Depth Camera uses the rear-facing wide-angle camera, the Telephoto and Ultra Wide cameras can be used in addition with an AVCaptureMultiCamSession.' TrueDepth doc abstract: 'A device that consists of two cameras, one Infrared and one YUV.' (iOS 11.1+). WWDC26 Camera and Photo Technologies Group Lab transcript (https://developer.apple.com/videos/play/wwdc2026/8018/, auto-generated): 'if you're using the front facing camera, the true depth camera, there's infrared that you can use for capturing depth.'"
+    },
+    {
+      "id": "depth-capture:Q2-a",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "AVFoundation LiDAR depth resolution: streaming depth maps up to 320x240; photo-attached depth maps 768x576; video formats from 640x480 up to a 12 MP 4032x3024 image; depth resolutions differ slightly between 16:9 and 4:3 formats to match the video aspect ratio. Depth and YUV frames may differ in resolution but always share field of view and aspect ratio.",
+      "source": "https://developer.apple.com/videos/play/wwdc2022/110429/ and https://developer.apple.com/documentation/avfoundation/avcapturedevice/devicetype-swift.struct/builtinlidardepthcamera",
+      "note": "iOS 15.4+. WWDC22 transcript (re-read): 'The LiDAR Depth Camera exposes many formats, from video resolutions of 640 by 480 to a full 12-megapixel image at 4032 by 3024.' 'While streaming, it can output depth maps up to 320 by 240.' 'And for photo capture, you can receive depth maps of 768 by 576.' 'Note, the depth resolutions are slightly different for 16 by 9 and 4 by 3 formats. This is to match the video's aspect ratio.' Doc page: 'While the resolution of the depth data and YUV frames may differ, their field of view and aspect ratio always match.' These figures are from 2022 hardware; no later Apple statement found."
+    },
+    {
+      "id": "depth-capture:Q2-c",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "LiDAR depth is 'absolute' (time of flight gives real-world scale) and is produced by fusing sparse LiDAR output with the rear wide camera's colour image through a machine-learning model into a dense map. Depth is filtered by default (noise reduction and hole filling); Apple says computer-vision apps should prefer unfiltered depth, and with filtering disabled the LiDAR Depth Camera excludes low-confidence points.",
+      "source": "https://developer.apple.com/videos/play/wwdc2022/110429/ and https://developer.apple.com/videos/play/wwdc2020/10611/",
+      "note": "WWDC22 (re-read): 'The LiDAR Depth Camera produces \"absolute depth.\" The time of flight technique used allows for real-world scale to be calculated.' 'The TrueDepth, Dual, Dual Wide, and Triple Cameras produce relative, disparity-based depth.' 'This new AVCaptureDevice produces high quality depth data by fusing sparse output from the LiDAR Scanner with the color image from the rear-facing wide-angle camera. The LiDAR and color inputs are processed using a machine learning model that outputs a dense depth map.' 'Depth data is filtered by default. Filtering reduces noise and fills in missing values, or holes, in the depth map. However, computer vision apps should prefer non-filtered depth data... When filtering is disabled, the LiDAR Depth Camera excludes low confidence points.' WWDC20: 'The colored RGB image from the wide-angle camera and the depth ratings from the LiDAR scanner are fused together using advanced machine learning algorithms to create a dense depth map'. See Q3-f for the accuracy-flag bug."
+    },
+    {
+      "id": "depth-capture:Q2-d",
+      "section": "depth-capture",
+      "status": "likely",
+      "claim": "Apple's stated LiDAR range is 'up to 5 meters' (March 2020 iPad Pro press release; an Apple Tech Talk repeats 'up to five meters away'); for close range an Apple Documentation Engineer said that for a 20-30 cm face-scanning use case you need to 'step back an additional 30cm, or so, for ARKit to sculpt confident geometry this close to the subject'.",
+      "source": "https://www.apple.com/newsroom/2020/03/apple-unveils-new-ipad-pro-with-lidar-scanner-and-trackpad-support-in-ipados/ (snippet: 'The LiDAR Scanner measures the distance to surrounding objects up to 5 meters away, works both indoors and outdoors, and operates at the photon level at nano-second speeds.'); https://developer.apple.com/videos/play/tech-talks/609/ ('Advanced Scene Understanding in AR', snippet: effective 'up to five meters away'); https://developer.apple.com/forums/thread/130326 (Apple Documentation Engineer, Mar 2020, read directly)",
+      "note": "The 5 m figure is Apple marketing: www.apple.com is blocked and the Tech Talk page redirects to the Tech Talks listing here, so both were read only via search snippets; no Apple developer reference document states a range. The forum thread was read directly: a developer wrote 'Apple claims that their LiDAR sensor can scan a room & objects up to 5 meters away', and the Apple engineer's close-range reply is quoted verbatim above (the earlier version misquoted it as 'build confident geometry'). That guidance concerns the scene-reconstruction mesh, not the raw depth map. Thread 130326 also records that as of Xcode 11.4 (iPadOS 13.4) the raw depth was not exposed; it arrived with ARKit 4 / iOS 14 (Q4-a)."
+    },
+    {
+      "id": "depth-capture:Q2-e",
+      "section": "depth-capture",
+      "status": "likely",
+      "claim": "Apple gives no numeric accuracy for LiDAR depth; an Apple engineer says 'the accuracy of individual depth values highly depends on' the ARConfidenceLevel, and the confidenceMap doc says ARKit is less confident for surfaces that are highly reflective or have high light absorption. Independent measurements: iPhone 12 Pro LiDAR about 1 cm absolute accuracy for small objects (precision falling below 10 cm side length, detection limit about 5 cm) and about +/-10 cm over a 130 x 15 x 10 m coastal cliff (Luetzenburg et al., Scientific Reports 2021); a 2026 Remote Sensing Letters study found iPhone 12 Pro and iPhone 15 Pro scanning RMSE on the order of 2 cm with no significant difference between models, and a handheld survey scanner about ten times better.",
+      "source": "https://developer.apple.com/forums/thread/650321 (Apple staff, Jun 2020, read directly); https://developer.apple.com/documentation/arkit/ardepthdata/confidencemap (read directly); https://www.nature.com/articles/s41598-021-01763-9 (abstract via search snippets; host blocked); https://www.tandfonline.com/doi/full/10.1080/2150704X.2026.2720055 (Erland and Gaulton, abstract via search snippets; host blocked)",
+      "note": "Apple statements verified: forum 650321 'the accuracy of individual depth values highly depends on this confidence level'; confidenceMap doc: 'ARKit is less confident about the accuracy of the LiDAR Scanner's depth measurements for surfaces that are highly reflective, or that have high light absorption' and 'If, for example, the confidenceMap format is kCVPixelFormatType_OneComponent8 (OSType L008)' (so OneComponent8 is given as an example, not a guarantee). Nature abstract snippets: '3D models with the dimensions of up to 130 x 15 x 10 m of a coastal cliff with an absolute accuracy of +/- 10 cm', 'Shapes of small objects are measured with an absolute accuracy of one centimeter', 'Precision is decreasing when scanning surfaces under 10 cm side length and the limit of detection for objects is around five cm'. The 2026 study's exact figures are contested across snippets (earlier session: 2.05 cm / 2.06 cm; this session: 1.92 cm iPhone 12 Pro / 2.21 cm iPhone 15 Pro average XYZ RMSE, 0.90 cm cloud-to-cloud between iPhones, and 'the iPhone 15 Pro did have a smaller RMSE by about 0.5 cm'); its Zenodo dataset names an iPhone 12 Pro Max. Treat any specific number as unverified; these are whole-scene scanning errors, not per-pixel error at 2-3 m."
+    },
+    {
+      "id": "depth-capture:Q3-a",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "AVCaptureDevice.DeviceType.builtInLiDARDepthCamera was introduced in iOS 15.4 / iPadOS 15.4 / Mac Catalyst 15.4 (tvOS 17.0); it is 'A device that consists of two cameras, one LiDAR and one YUV', discoverable only via AVCaptureDevice.DiscoverySession or default(_:for:position:). All of its formats support depth data delivery.",
+      "source": "https://developer.apple.com/documentation/avfoundation/avcapturedevice/devicetype-swift.struct/builtinlidardepthcamera and https://developer.apple.com/videos/play/wwdc2022/110429/",
+      "note": "Doc page (re-read): availability iOS 15.4, iPadOS 15.4, Mac Catalyst 15.4, tvOS 17.0; 'The LiDAR camera provides high-quality, high-accuracy depth information by measuring the round trip of an artificial light signal that a laser emits. The device synchronizes and perspective-corrects this data to frames that the YUV camera produces.' 'You can only discover devices of this type by using an AVCaptureDevice.DiscoverySession or by calling the default(_:for:position:) method.' WWDC22: 'And like the TrueDepth AVCaptureDevice, all of its formats support depth data delivery.'"
+    },
+    {
+      "id": "depth-capture:Q3-c",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "Still photo with depth: set AVCapturePhotoOutput.isDepthDataDeliveryEnabled (only if isDepthDataDeliverySupported, iOS 11.0+, key-value observable and dependent on sessionPreset/activeFormat), then AVCapturePhotoSettings.isDepthDataDeliveryEnabled = true (raises an exception if the output was not enabled first; 'adds significant processing time'); the result arrives as AVCapturePhoto.depthData (AVDepthData?, nil if not requested). embedsDepthDataInPhoto defaults to true, so the depth map is included 'as an embedded attachment when you flatten the photo data for output in compatible file formats'; Apple names HEIF, JPEG and DNG as file types that carry depth and confirms the embedded depth is compressed (no uncompressed option).",
+      "source": "https://developer.apple.com/documentation/avfoundation/avcapturephotooutput/isdepthdatadeliverysupported ; https://developer.apple.com/documentation/avfoundation/avcapturephotosettings/isdepthdatadeliveryenabled ; https://developer.apple.com/documentation/avfoundation/avcapturephoto/depthdata ; https://developer.apple.com/documentation/avfoundation/avcapturephotosettings/embedsdepthdatainphoto ; https://developer.apple.com/documentation/avfoundation/avdepthdata/init(fromdictionaryrepresentation:) ; https://developer.apple.com/forums/thread/649511",
+      "note": "All iOS 11.0+ (re-read). isDepthDataDeliverySupported: 'This property's value can change if the sessionPreset property of the current capture session or the activeFormat property of the underlying capture device changes... This property is key-value observable.' Settings page: 'requires that the photo output first be configured for depth capture using its own isDepthDataDeliveryEnabled property (and raises an exception otherwise)' and 'adds significant processing time before delivery of results'. embedsDepthDataInPhoto says only 'compatible file formats' and does not mention fileDataRepresentation(); the HEIF/JPEG/DNG list is from the AVDepthData init(fromDictionaryRepresentation:) page ('read from a HEIF, JPEG, or DNG file containing depth data'). Thread 649511 (Apple Media Engineer, Jun 2020, read directly): 'We do not support writing uncompressed disparity/depth data to HEIC or JPEG.' 'Capturing photos with depth' article (re-read): enabling depth 'requires an internal reconfiguration of the capture pipeline', so enable it before the first capture; 'Enabling depth capture on a dual camera locks the zoom factor of both the wide and telephoto cameras.'"
+    },
+    {
+      "id": "depth-capture:Q3-d",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "AVDepthData (iOS 11.0+) wraps either a depth map (metres per pixel) or a disparity map (1/metres: pixelShift / (pixelFocalLength * baselineInMeters)); the four CoreVideo pixel formats are kCVPixelFormatType_DisparityFloat16/32 and kCVPixelFormatType_DepthFloat16/32; converting(toDepthDataType:) converts between them; holes are NaN. Maps are non-rectilinear (lens-distorted): 'you can use an AVDepthData map as a proxy for depth when rendering effects to its accompanying image, but not to correlate points in 3D space' unless rectified with cameraCalibrationData.",
+      "source": "https://developer.apple.com/documentation/avfoundation/avdepthdata ; https://developer.apple.com/videos/play/wwdc2017/507/ ; https://developer.apple.com/documentation/corevideo/kcvpixelformattype_disparityfloat16 ; https://developer.apple.com/documentation/corevideo/kcvpixelformattype_disparityfloat32 ; https://developer.apple.com/documentation/corevideo/kcvpixelformattype_depthfloat32",
+      "note": "AVDepthData overview (re-read) gives the formula, 'A depth map describes at each pixel the distance to an object, in meters', the non-rectilinear paragraph and the 'proxy for depth' sentence verbatim; it does not itself list the pixel-format constants or NaN. WWDC17 507 (re-read): 'CoreVideo defines four new pixel formats... The first two are for normalized disparity and it's measured in 1 over meters... a 16-bit flavor and a 32-bit flavor. The second two are for depth and they're measured in meters.' and 'Holes are expressed in the depthDataMap as not a number standard floating-point representation, either 16-bit or 32-bit.' Constant names confirmed on the CoreVideo pages (DisparityFloat16, DisparityFloat32, DepthFloat32), in Apple's LiDAR sample (DepthFloat16) and in 'Capturing photos with depth' (DepthFloat16/32). Also exposes depthDataAccuracy, depthDataQuality, isDepthDataFiltered, availableDepthDataTypes."
+    },
+    {
+      "id": "depth-capture:Q3-e",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "Camera intrinsics are available: AVCameraCalibrationData (iOS 11.0+) carries intrinsicMatrix (matrix_float3x3), intrinsicMatrixReferenceDimensions, extrinsicMatrix (matrix_float4x3), pixelSize (millimetres), lensDistortionLookupTable, inverseLensDistortionLookupTable and lensDistortionCenter. AVDepthData.cameraCalibrationData is populated for depth captured by an AVCaptureDevice, but 'Depth data read from a file ... or transformed through arbitrary editing of its data map might not contain calibration data.'",
+      "source": "https://developer.apple.com/documentation/avfoundation/avcameracalibrationdata and https://developer.apple.com/documentation/avfoundation/avdepthdata/cameracalibrationdata",
+      "note": "Both re-read; iOS 11.0, iPadOS 11.0, Mac Catalyst 14.0, macOS 10.13, tvOS 11.0, visionOS 1.0. Apple's LiDAR sample reads intrinsicMatrix and intrinsicMatrixReferenceDimensions from the streamed depth's calibration data; AVCapturePhotoOutput also exposes isCameraCalibrationDataDeliverySupported. Apple says Camera-app Portrait files carry calibration metadata (Q6-c), but whether init(fromDictionaryRepresentation:) yields a non-nil cameraCalibrationData for those files must be tested."
+    },
+    {
+      "id": "depth-capture:Q3-f",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "AVDepthData.Accuracy: .relative means 'Values within the depth data map are usable for foreground/background separation, but are not absolutely accurate in the physical world'; .absolute means 'Values within the depth map are absolutely accurate within the physical world.' Apple DTS (Aug 2022) stated the builtInLiDARDepthCamera API wrongly reports relative although its depth is absolute ('a known issue'), while builtInTrueDepthCamera correctly reports absolute.",
+      "source": "https://developer.apple.com/documentation/avfoundation/avdepthdata/accuracy and https://developer.apple.com/forums/thread/712089",
+      "note": "Both re-read. DTS Engineer: 'In the case of the builtInLiDARDepthCamera, the api is incorrect, it has an accuracy of \"absolute\", but the api is returning \"relative\". This is a known issue, no need to file a bug report of your own. In the case of the builtInTrueDepthCamera, the api is correct, it has an accuracy of \"absolute\".' Accuracy overview also says: 'The accuracy of a depth data map is highly dependent on the camera calibration data used to generate it.' Do not gate LiDAR usage on depthDataAccuracy == .absolute; gate on device type. Whether the bug was fixed after 2022 is unverified."
+    },
+    {
+      "id": "depth-capture:Q6-c",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "Camera-app Portrait images store their depth as disparity maps with camera calibration metadata (Apple, WWDC23), so query kCGImageAuxiliaryDataTypeDisparity first and convert with converting(toDepthDataType:) if metres are needed. The resolution of the embedded map is not documented.",
+      "source": "https://developer.apple.com/videos/play/wwdc2023/111241/ ('Explore 3D body pose and person segmentation in Vision')",
+      "note": "Upgraded from unverified. WWDC23 transcript (read directly): 'Images captured by Camera app, like Portrait images in photos, always store Depth as disparity maps with camera calibration metadata.' and 'Depth metadata captured by camera sensors contains a Depth map represented as either Disparity or Depth format. These formats are interchangeable and can be converted to each other using AVFoundation.' Consistent with WWDC17 (XMP carries calibration) and Apple's init(fromDictionaryRepresentation:) example (Disparity). Still unknown: embedded map resolution, whether this also holds for 'Portraits in Photo Mode' captures (Q6-e), and whether AVDepthData.cameraCalibrationData is non-nil after loading (test on device)."
+    },
+    {
+      "id": "depth-capture:Q6-d",
+      "section": "depth-capture",
+      "status": "unverified",
+      "claim": "Whether Data returned by PhotosPickerItem.loadTransferable(type: Data.self) retains the depth/matte auxiliary image.",
+      "source": "https://developer.apple.com/documentation/photosui/photospickeritem/encodingdisambiguationpolicy (verified context); https://developer.apple.com/forums/thread/102511 ; https://developer.apple.com/forums/thread/677575",
+      "note": "Verified: PhotosPickerItem.EncodingDisambiguationPolicy (iOS 16.0+) is a struct with static constants automatic ('chooses the best encoding'), current ('chooses the current encoding to avoid transcoding, if possible') and compatible ('chooses the most compatible encoding even if transcoding is necessary'). Developer reports read directly, neither answered by Apple, both using UIImagePickerController (not PhotosPicker): thread 102511 (May 2018) found CGImageSourceCopyAuxiliaryDataInfoAtIndex returned nil for Disparity and Depth on the picker's temp JPEG of a TrueDepth portrait; thread 677575 (Apr 2021, 0 replies) could extract depth and matte from 'Most Compatible' JPG portraits but not from 'High Efficiency' HEIC portraits (iPhone 11 iOS 14.3, iPhone 12 Pro iOS 14.4.1). Must be tested on device; prefer .current and fall back to PHAsset/PHImageManager original data."
+    },
+    {
+      "id": "depth-capture:Q7-e",
+      "section": "depth-capture",
+      "status": "verified",
+      "claim": "High-resolution photo capture with depth: Apple engineers (WWDC26 lab) say 24 MP captures can include depth if the app opts into deferred processing, sets maxPhotoDimensions to a supported 24 MP size, uses quality prioritization and enables depth data delivery; 24 MP photos exist since iPhone 15 and only the photo session preset supports 24/48 MP.",
+      "source": "https://developer.apple.com/videos/play/wwdc2026/8018/ (Camera and Photo Technologies Group Lab) and https://developer.apple.com/videos/play/wwdc2026/304/ ('Implement high resolution photo capture')",
+      "note": "Lab transcript (auto-generated, read directly): 'Is it possible to capture 24 megapixel images with depth data... 24 megapixel processing is time consuming enough that we require that you opt into deferred processing... make sure that you opt in into the max [photo] dimensions... if you select quality prioritization as well as enable depth data delivery, you will get captures with depth.' Session 304: 'Starting with iPhone 15, the camera supports 24 megapixel photos.' 'Note - only the photo preset supports 24 and 48 megapixel photos.' 'Starting with iOS 27 on iPhone 16 and iPhone 17, the system also processes balanced fast captures later using deferred processing.' The OS version in which 24 MP + depth became possible is not stated; the lab also says depth processing was made 'available at on all kinds of zoom levels' in an unnamed release."
+    },
+    {
+      "id": "body-apis:Q1-4",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "The request returns a single observation for the most prominent person only: 'The request only supports the detection and results for the most prominent person in the frame, so it generates a single observation. For example, performing a request on an image with three people — with one person being closer to the camera — returns an observation that detects the person closest to the camera.' WWDC23: 'This initial revision returns one skeleton for the most prominent person detected in the frame.'",
+      "source": "https://developer.apple.com/documentation/vision/identifying-3d-human-body-poses-in-images",
+      "note": "iOS 17.0+. Both sentences read verbatim (article and WWDC23 transcript). Contrast the 2D request, whose results is `[VNHumanBodyPoseObservation]?` with one observation per detected person."
+    },
+    {
+      "id": "body-apis:Q1-5",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "VNHumanBodyPose3DObservation.bodyHeight is declared `var bodyHeight: Float { get }` ('The estimated human body height, in meters'). Its discussion: 'The framework returns an accurate height if heightEstimation is measured; otherwise, it returns a reference height.' The reference height is a fixed 1.8 metres: 'If there's enough depth metadata, bodyHeight provides an estimated height of the subject, in meters; otherwise, bodyHeight returns a reference height of 1.8 meters.'",
+      "source": "https://developer.apple.com/documentation/vision/vnhumanbodypose3dobservation/bodyheight",
+      "note": "iOS 17.0+. The 1.8 m sentence read in https://developer.apple.com/documentation/vision/identifying-3d-human-body-poses-in-images and in the WWDC23 transcript ('this height will either be a more accurate measured height or a reference height of 1.8 meters'). Implication: without a measured height every subject is scaled as if 1.8 m tall, so absolute lengths are untrustworthy while joint-to-joint ratios remain usable."
+    },
+    {
+      "id": "body-apis:Q1-7",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "cameraOriginMatrix is declared `var cameraOriginMatrix: simd_float4x4 { get }` and described as 'A transform from the skeleton hip to the camera'; Apple says to use it 'To get an accurate understanding of where the camera was when capturing the image'. cameraRelativePosition(_:) is declared `func cameraRelativePosition(_ jointName: VNHumanBodyPose3DObservation.JointName) throws -> simd_float4x4`, returns 'a position relative to the camera for the body joint you specify', with the return value documented as 'The joint position, in meters', and is suggested 'to get an estimate of how far the person was away from a camera'.",
+      "source": "https://developer.apple.com/documentation/vision/vnhumanbodypose3dobservation",
+      "note": "iOS 17.0+. Declarations and return-value text read on https://developer.apple.com/documentation/vision/vnhumanbodypose3dobservation/cameraoriginmatrix and https://developer.apple.com/documentation/vision/vnhumanbodypose3dobservation/camerarelativeposition(_:). The sample page (https://developer.apple.com/documentation/vision/detecting-human-body-poses-in-3d-with-vision) notes: 'Due to a behavior change with cameraOriginMatrix API, if this sample project is run on a device on a build earlier than beta 3, camera position will be rotated 180 degrees' (iOS 17 betas). This matrix is relative to the person's hip, not to gravity, so it is not a device-pitch reading (see Q7-5)."
+    },
+    {
+      "id": "body-apis:Q2-4",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "A measured (as opposed to 1.8 m reference) bodyHeight requires LiDAR via a live capture session: 'The framework provides a measured height only when configuring an AVCaptureSession to use the LiDAR camera.' WWDC23: 'When capturing Depth in a live capture session, you have the added benefit of specifying the session to use LiDAR if the device supports it. LiDAR is powerful because it allows for accurate scale and measurement of the scene.'",
+      "source": "https://developer.apple.com/documentation/vision/identifying-3d-human-body-poses-in-images",
+      "note": "iOS 17.0+. Both quotations re-read verbatim (article; WWDC23 transcript). Architectural consequence: a photo picked from the library (even a Portrait photo with embedded disparity) is expected to yield heightEstimation == .reference; only an in-app capture on a LiDAR device (Q8-1 lists them) is documented to yield .measured. Whether a LiDAR-captured photo later re-loaded from a file with embedded depth yields .measured remains unsettled (open question)."
+    },
+    {
+      "id": "body-apis:Q3-1",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "VNDetectHumanBodyPoseRequest (iOS 14.0+, iPadOS 14.0+, Mac Catalyst 14.0+, macOS 11.0+, tvOS 14.0+, visionOS 1.0+) detects 'up to 19 unique body points': nose, leftEye, rightEye, leftEar, rightEar, neck, leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist, root ('The root (waist)'), leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle. Groups: face, torso, leftArm, rightArm, leftLeg, rightLeg, all. Points 'are in normalized coordinates (0.0 to 1.0), with the origin at the bottom-left'; convert with VNImagePointForNormalizedPoint(_:_:_:). results is declared `var results: [VNHumanBodyPoseObservation]? { get }` and 'The request returns a unique observation for each detected human body pose'.",
+      "source": "https://developer.apple.com/documentation/vision/vnhumanbodyposeobservation/jointname",
+      "note": "iOS 14.0+. Joint names counted on the JointName page (6 head + 6 arm + 1 waist + 6 leg = 19); groups on https://developer.apple.com/documentation/vision/vnhumanbodyposeobservation/jointsgroupname; coordinate aside and per-person sentence in https://developer.apple.com/documentation/vision/detecting-human-body-poses-in-images (example runs on a still CGImage); results declaration on https://developer.apple.com/documentation/vision/vndetecthumanbodyposerequest/results. Only VNDetectHumanBodyPoseRequestRevision1 is documented on the classic request page."
+    },
+    {
+      "id": "body-apis:Q3-3",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "Apple's accuracy guidance for 2D body pose explicitly flags clothing: 'A subject wearing flowing or robe-like clothing reduces the detection accuracy.' Also: 'The subject's height should ideally be at least a third of the overall image height', 'A large portion of the subject's key body regions and points should be present in the image', and 'Attempting to detect body poses in dense crowd scenes is likely to produce inaccurate results.'",
+      "source": "https://developer.apple.com/documentation/vision/detecting-human-body-poses-in-images",
+      "note": "iOS 14.0+. All four bullets re-read verbatim under 'Improve Pose-Detection Accuracy'. The same article notes a regionOfInterest 'generally results in more accurate pose estimation'. Directly relevant to a fashion app: dresses, coats and loose garments are the cases Apple says degrade pose detection, so pose-derived fit advice needs a confidence gate."
+    },
+    {
+      "id": "body-apis:Q3-4",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "VNDetectHumanRectanglesRequest (iOS 13.0+) returns [VNHumanObservation] bounding boxes. Its upperBodyOnly property (`var upperBodyOnly: Bool { get set }`, iOS 15.0+) defaults to true: 'The default value of true indicates that the request requires detecting a person's upper body only to find the bound box around it.' Full-body boxes require setting it to false and come with Revision 2 (WWDC21: 'it currently detects human upper body only. We are adding new functionality to this request, and therefore upgrading this revision to revision number two'). VNHumanObservation (iOS 15.0+) echoes upperBodyOnly: 'A Boolean value that indicates whether the observation represents an upper-body or full-body rectangle.'",
+      "source": "https://developer.apple.com/documentation/vision/vndetecthumanrectanglesrequest/upperbodyonly",
+      "note": "Request page: https://developer.apple.com/documentation/vision/vndetecthumanrectanglesrequest (iOS 13.0+, Revision1 and Revision2 constants, no discussion). WWDC21 session 10040 transcript (https://developer.apple.com/videos/play/wwdc2021/10040/) re-read verbatim; it also says 'The default value for this property is set to true to maintain' backward compatibility. For an outfit app, leaving the default yields head-and-shoulders boxes, not whole-body crops."
+    },
+    {
+      "id": "body-apis:Q4-1",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "VNGeneratePersonSegmentationRequest (iOS 15.0+, macOS 12.0+) 'produces a matte image for a person it finds in the input image'; results is `[VNPixelBufferObservation]?` and the mask is VNPixelBufferObservation.pixelBuffer (`var pixelBuffer: CVPixelBuffer { get }`). It is semantic, not instance-level (WWDC21: 'it will return a single mask for all people in the frame'). qualityLevel has cases .accurate ('Prefers image quality over performance'), .balanced and .fast; WWDC21 states accurate 'is also the default one' and recommends 'accurate level for computational photography', 'balanced level... for video frame-by-frame segmentation and fast for streaming processing'. outputPixelFormat supports kCVPixelFormatType_OneComponent8 (default; CoreVideo describes it as '8-bit one component, black is zero'), kCVPixelFormatType_OneComponent16Half and kCVPixelFormatType_OneComponent32Float.",
+      "source": "https://developer.apple.com/documentation/vision/vngeneratepersonsegmentationrequest/outputpixelformat",
+      "note": "iOS 15.0+. Attribution corrected: the API pages (request, https://developer.apple.com/documentation/vision/vngeneratepersonsegmentationrequest/qualitylevel-swift.enum) give only the one-line case descriptions and no default; the default and use-case recommendations are WWDC21 10040 statements; 'black is zero' is the abstract of https://developer.apple.com/documentation/corevideo/kcvpixelformattype_onecomponent8. WWDC21 also says 'mask resolution, memory consumption, processing time' rise with quality but gives no pixel dimensions, and advises 'segment up to four people in the scene where all people are mostly visible' with 'the height of each person should be at least half of the image height'. Note the request inherits from VNStatefulRequest. This mask is the practical 'clothing silhouette' primitive: it separates person+clothes from background but does not separate garments from skin."
+    },
+    {
+      "id": "body-apis:Q6-1",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "iOS 18 introduced the Swift-only Vision API: DetectHumanBodyPoseRequest (`struct`, iOS 18.0+, iPadOS 18.0+, Mac Catalyst 18.0+, macOS 15.0+, tvOS 18.0+, visionOS 2.0+) with detectsHands ('The default value is true, and requires revision2') producing HumanBodyPoseObservation with leftHand/rightHand HumanHandPoseObservation properties (WWDC24: 'Holistic body pose allows you to detect hands and body together'); DetectHumanBodyPose3DRequest (`final class`, iOS 18.0+, conforms to StatefulRequest) producing HumanBodyPose3DObservation whose bodyHeight is `let bodyHeight: Measurement<UnitLength>` ('The estimated human body height, in meters'), with heightEstimationTechnique (EstimationTechnique .measured / .reference, same descriptions as the classic enum), cameraOriginMatrix, cameraRelativePosition(for:), joint(for:), allJoints(in:) and pointInImage(for:) -> NormalizedPoint. WWDC24: 'Vision will only introduce new features in Swift moving forward.'",
+      "source": "https://developer.apple.com/documentation/vision/detecthumanbodyposerequest/detectshands",
+      "note": "iOS 18.0+. Pages re-read: https://developer.apple.com/documentation/vision/detecthumanbodyposerequest, https://developer.apple.com/documentation/vision/detecthumanbodypose3drequest (init(_:frameAnalysisSpacing:)), https://developer.apple.com/documentation/vision/humanbodypose3dobservation, https://developer.apple.com/documentation/vision/humanbodypose3dobservation/bodyheight, https://developer.apple.com/documentation/vision/humanbodypose3dobservation/estimationtechnique, https://developer.apple.com/documentation/vision/humanbodyposeobservation; WWDC24 10163 transcript (https://developer.apple.com/videos/play/wwdc2024/10163/) quotations verbatim. Given the iOS 26 target, the app can adopt the new API exclusively."
+    },
+    {
+      "id": "body-apis:Q6-5",
+      "section": "body-apis",
+      "status": "likely",
+      "claim": "Apple ships no first-party garment, clothing or fabric classification API. The closest thing is the generic VNClassifyImageRequest (iOS 13.0+) taxonomy, whose identifiers are only exposed at runtime via supportedIdentifiers() (iOS 15.0+); a community dump of Revision 1 lists 1303 identifiers including 'clothing', 'jacket', 'jeans', 'suit', 'hoodie', 'gown', 'wedding_dress', 'tuxedo', 'kimono', 'sari', 'scarf', 'necktie', 'footwear', 'sneaker', 'boot', 'high_heel', 'hat', 'textile' (also 'sock', 'glove', 'bag', 'sunglasses', 'jewelry'), but no 'dress', 'skirt', 'shirt', 'coat', 'sweater', 'fabric', 'denim', 'leather' or 'wool'.",
+      "source": "https://gist.github.com/ktustanowski/56c0d7541813868fed4aceb60ab5d149",
+      "note": "Gist re-read: file 'VNClassifyImageRequest.Supportedidentifiers.txt', header '1303 elements'; every listed present/absent label was checked programmatically. Absence claim: none of the WWDC23/24/25/26 Vision sessions or Vision reference pages read mention garment or fabric classification. Apple's page https://developer.apple.com/documentation/vision/vnclassifyimagerequest documents no taxonomy; knownClassifications(forRevision:) is deprecated since iOS 15.0 and supportedIdentifiers() is iOS 15.0+. Confirm the label set by calling supportedIdentifiers() on iOS 26 before relying on it. Fabric/texture and garment-type recognition would need a custom Core ML model or a server-side model."
+    },
+    {
+      "id": "body-apis:Q7-1",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "Device pitch during capture comes from CoreMotion: CMDeviceMotion.attitude (iOS 4.0+) is a CMAttitude, 'the orientation of a body relative to a given frame of reference', offering 'a rotation matrix, a quaternion, and Euler angles (roll, pitch, and yaw values)'. CMAttitude.pitch (`var pitch: Double { get }`) is 'The pitch of the device, in radians' and 'A pitch is a rotation around a lateral axis that passes through the device from side to side.' CMDeviceMotion.gravity (`var gravity: CMAcceleration { get }`, iOS 4.0+) is 'The gravity acceleration vector expressed in the device's reference frame', which gives tilt without an attitude reference frame.",
+      "source": "https://developer.apple.com/documentation/coremotion/cmattitude/pitch",
+      "note": "iOS 4.0+, iPadOS 4.0+, Mac Catalyst 13.1+, macOS 10.15+, visionOS 1.0+, watchOS 2.0+. Pages re-read: https://developer.apple.com/documentation/coremotion/cmdevicemotion/attitude, https://developer.apple.com/documentation/coremotion/cmattitude, https://developer.apple.com/documentation/coremotion/cmdevicemotion/gravity. Updates start via CMMotionManager.startDeviceMotionUpdates(...). The sign convention and range of pitch are not stated on the pitch page. Only works for in-app capture; a library photo carries no CoreMotion data."
+    },
+    {
+      "id": "body-apis:Q7-2",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "AVCapturePhoto.metadata (`var metadata: [String : Any] { get }`, iOS 11.0+) is documented only generically: 'See CGImageProperties for possible keys and values. Metadata captured with a photo may include image orientation, Exif camera properties, and Live Photo metadata.' Apple documents no pitch, attitude or gravity key. kCGImagePropertyMakerAppleDictionary (iOS 7.0+) exists as 'A dictionary of key-value pairs for an image from an Apple camera' but Apple documents none of its keys.",
+      "source": "https://developer.apple.com/documentation/avfoundation/avcapturephoto/metadata",
+      "note": "MakerApple key page: https://developer.apple.com/documentation/imageio/kcgimagepropertymakerappledictionary (declaration and abstract only, no discussion section). So no documented capture-metadata path yields device pitch."
+    },
+    {
+      "id": "body-apis:Q8-1",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "Apple's iPhone User Guide page 'Models with a LiDAR Scanner' lists exactly: iPhone 12 Pro, iPhone 12 Pro Max, iPhone 13 Pro, iPhone 13 Pro Max, iPhone 14 Pro, iPhone 14 Pro Max, iPhone 15 Pro, iPhone 15 Pro Max, iPhone 16 Pro, iPhone 16 Pro Max, iPhone 17 Pro, iPhone 17 Pro Max, iPhone 18 Pro, iPhone 18 Pro Max. No non-Pro model (including iPhone 16e, iPhone 17, iPhone 17e and iPhone Air) appears. The iPad counterpart lists iPad Pro 11-inch (2nd, 3rd, and 4th generations), iPad Pro 11-inch (M4 and M5), iPad Pro 12.9-inch (4th generation and later), iPad Pro 13-inch (M4 and M5). Apple's iPhone 17 Pro tech specs page lists 'LiDAR Scanner' under Sensors and an 'A19 Pro chip'.",
+      "source": "https://support.apple.com/guide/iphone/aside/iphc07537a89/ios",
+      "note": "Pages read 2026-11-06: iPhone list above; iPad list at https://support.apple.com/guide/ipad/aside/ipad8a95fdc0/ipados; iPhone 17 Pro specs at https://support.apple.com/en-us/125090. Intersected with Q8-2, the iOS 26 LiDAR-capable iPhones are the 12 Pro/Pro Max through 17 Pro/Pro Max (12 models); the TrueDepth front camera (builtInTrueDepthCamera, iOS 11.1+) is a separate, front-facing depth source present on far more models and is not listed here."
+    },
+    {
+      "id": "body-apis:Q8-2",
+      "section": "body-apis",
+      "status": "verified",
+      "claim": "Apple's 'iPhone models compatible with iOS 26' page lists 31 models: iPhone 11, 11 Pro, 11 Pro Max, iPhone SE (2nd generation), 12 mini, 12, 12 Pro, 12 Pro Max, 13 mini, 13, 13 Pro, 13 Pro Max, iPhone SE (3rd generation), 14, 14 Plus, 14 Pro, 14 Pro Max, 15, 15 Plus, 15 Pro, 15 Pro Max, 16, 16 Plus, 16 Pro, 16 Pro Max, 16e, 17, 17 Pro, 17 Pro Max, iPhone Air, 17e. The oldest entries, iPhone 11 and iPhone SE (2nd generation), both carry an 'A13 Bionic chip' per Apple's tech-specs pages, so every iOS 26-compatible iPhone meets the A12-or-later floor Apple cites for Vision 3D body pose (Q1-10) and ARKit body tracking (Q5-2); iPhone XS/XS Max/XR (A12) are not on the list.",
+      "source": "https://support.apple.com/guide/iphone/iphone-models-compatible-with-ios-26-iphe3fa5df43/26.0/ios/26.0",
+      "note": "Version-pinned URL read 2026-11-06 (the unpinned URL now redirects to the iOS 27 list, which adds iPhone 18 Pro/Pro Max and iPhone Duo). Chip lines read on https://support.apple.com/en-us/111865 (iPhone 11: 'A13 Bionic chip') and https://support.apple.com/en-us/111882 (iPhone SE 2nd generation: 'A13 Bionic chip'). Note the A14-or-later floor of DetectLensSmudgeRequest (Q6-3) excludes the A13 models."
+    },
+    {
+      "id": "fit-rules:F1",
+      "section": "fit-rules",
+      "status": "likely",
+      "claim": "Trouser break is the fold where the hem meets the shoe. Tapered Menswear (page read directly) defines no break as a hem that 'barely touches the shoe' / 'sit[s] precisely above the shoe' and full break as 'a noticeable fold over the shoe'; its length chart steps in quarter inches: no break = inseam, half break = +0.25 in, full break = +0.5 to +1.0 in (rows read: 30 / 30.25 / 30.5-31; 31 / 31.25 / 31.5-32; 32 / 32.25 / 32.5-33 in; metric rows 76 / 76.5 / 77-78.5 cm). It adds that tapered legs 'look best with no break or a slight break' and that a full break 'can cause excess fabric to gather above your shoes'.",
+      "source": "https://taperedmenswear.com/blogs/tapered-blog/trouser-break-guide",
+      "note": "A retailer chart, not a standard, but read on the live page this time. The Mainline Menswear page cited previously renders only via JavaScript (64 characters of text to a plain client), so the definitions attributed to it (half break = 1-2 in of fold, hem 0.5 in past the shoe top, 'no break' measured to the top of the ankle bone or shoe collar) could not be checked and were removed. The quarter-inch steps set the tolerance scale (about 6 mm). Landmarks for the app: trouser hem edge and shoe top edge; this chart does not reference the ankle bone."
+    },
+    {
+      "id": "fit-rules:F2",
+      "section": "fit-rules",
+      "status": "likely",
+      "claim": "Cropped/ankle trousers: YouLookFab (2018, read directly) states 'The length varies between two to six inches above the ankle bone. Lengths are typically two to three inches above the ankle bone. Two inches is quite the sweet spot, especially when the calf is wider and more muscular'; commenters report personal sweet spots of 2-3 in.",
+      "source": "https://youlookfab.com/2018/04/12/the-perfect-length-for-ankle-pants/",
+      "note": "Style blog, no standard. The '2-4 in from other guides' figure in the earlier draft had no attributable source and was dropped. Usable as a +/-1 in (2.5 cm) window around 5 cm above the lateral malleolus; the 3D skeleton's ankle joint is the nearest landmark."
+    },
+    {
+      "id": "fit-rules:F3",
+      "section": "fit-rules",
+      "status": "likely",
+      "claim": "Jacket sleeve / shirt cuff rule, consistent across three tailoring guides read directly: Kute Tailor: 'Suit jacket sleeves should end just above the wrist bone, with 1/4 to 1/2 inch of shirt cuff visible'; Nathan Tailors: 'Arms at your sides: The shirt cuff should hit right at the wrist bone. Arms bent at 90 degrees: The cuff should not ride up past the wrist. For jackets specifically: 1/4\" to 1/2\" of shirt cuff should remain visible below the jacket sleeve in both positions'; Westwood Hart: 'Jacket sleeves should end just past the wrist bone' and 'generally, about 1/4 to 1/2 inch is considered appropriate'.",
+      "source": "https://www.kutetailor.com/blog/perfect-sleeve-length-how-long-should-suit-jacket-sleeves-be.html ; https://www.nathantailors.com/guides/how-to-measure-sleeve-length ; https://westwoodhart.com/blogs/westwood-hart/correct-sleeve-length-dress-shirts-jackets-suits-guide",
+      "note": "The variants listed in the earlier draft (3/4 in for short arms, 1/4 in for long arms, 3/4-1 in for formalwear) appear on none of the three cited pages and were removed. Guides differ on 'just above' vs 'just past' the wrist bone for the jacket sleeve. The window is 1/4 in (about 6 mm), the tightest rule in the set and below typical phone pose/edge precision at full-body distance. Nathan Tailors also notes a straight-arm sleeve measurement 'comes out 1/2\" to 1\" shorter than needed', i.e. arm pose shifts the cuff by that much. Landmarks: ulnar styloid (wrist bone), jacket cuff edge, shirt cuff edge."
+    },
+    {
+      "id": "fit-rules:F5",
+      "section": "fit-rules",
+      "status": "likely",
+      "claim": "Shoulder seam placement (both pages read directly): Proper Cloth: 'the shoulder seams of the jacket should end slightly past your shoulder bones without pushing past the top of the arm', the 'Shoulder Width should be slightly wider than your shoulder bones by approximately .5\" (.25\" on each side)', seams should meet the sleeve 'without wrinkles, divots, tension, or pulling'; too wide shows 'a dimple at the top of the sleeves', too narrow 'fabric pulled tight on the upper arms'. Decrum: the target is the shoulder point, 'also called the acromion point', 'Not 1cm inside it (too narrow), not 1cm outside it (too wide)'; a too-wide seam 'slides down the upper arm, typically 2-4cm beyond the acromion'; 'A jacket with a perfect chest and incorrect shoulder fit cannot be fixed at any price'.",
+      "source": "https://propercloth.com/reference/how-jacket-shoulder-width-should-fit ; https://decrum.ca/blogs/news/the-physics-of-the-perfect-shoulder-fit-in-rigid-materials",
+      "note": "Correction: the earlier 'more than 1/2 in past the shoulder edge cannot be fixed' is on neither page; Proper Cloth's 0.5 in is the ideal total overhang (0.25 in per side) and Decrum's +/-1 cm is the tolerance. Vendor rules of thumb, not a standard. Landmark: acromion vs sleeve-head seam; the divot/dimple is a surface-shape cue a depth map could in principle see."
+    },
+    {
+      "id": "fit-rules:F7",
+      "section": "fit-rules",
+      "status": "likely",
+      "claim": "Rule of thirds for outfits (A Well Styled Life, read directly): split the outfit into '1/3 Top + 2/3 Bottom' ('A shorter top block paired with longer, full-length trousers or a midi skirt') or '2/3 Top + 1/3 Bottom' ('A longer upper layer—such as a 3/4-length coat, duster, or longline cardigan—worn over a shorter visible bottom section'); 'The fastest way to achieve a 1/3-to-2/3 ratio is to define the waistline', e.g. tucking into high-rise trousers 'immediately breaks the outfit into one upper third and two lower thirds', and 'A jacket that hits right at the high hip creates an automatic 1/3 top block'.",
+      "source": "https://awellstyledlife.com/the-rule-of-thirds-for-outfits/",
+      "note": "The two Inside Out Style pages (tops ending at the hip bone 'where it juts out', the 'golden number' hem rule) returned 403, so those statements were removed; 'avoid a horizontal line at the widest part of the body' and 'only needs to be approximated' are not on the reachable page and were removed. Being a ratio of visible outfit segments (neckline/shoulder to hem, hem to shoe) it is scale-free and needs no metric depth, but it compares an upper and a lower vertical span and is therefore the rule most exposed to perspective (F14)."
+    },
+    {
+      "id": "fit-rules:F11",
+      "section": "fit-rules",
+      "status": "likely",
+      "claim": "Photography guides (all read directly) agree qualitatively: Zoner: photographing 'from up high' can leave the subject 'with shortened legs' because of 'a striking perspective that shrinks the parts of the body that are farther from the lens', and 'The lower the shot, the more the legs are stretched out' (shooting from the knees is 'an extreme'); HKBN: 'Tip 1: Take photos at your waist level' so that 'the person's body proportions appear slender and look taller'; The Slanted Lens (tests with 50 mm and 24 mm lenses at several heights): 'We're now at waist level, and her body is more evenly proportioned', shooting from above is 'shortening her legs', from below 'Her legs are a bit larger, her head's a bit smaller'.",
+      "source": "https://learn.zoner.com/shooting-portraits-on-the-right-level/ ; https://reg.hkbn.net/WwwCMS/upload/web/en/HKBNConnected_8th-shooting-tips_EN.html ; https://theslantedlens.com/how-camera-angle-affects-body-shape-a-video-lighting-tutorial/",
+      "note": "None quantify the proportion change. The earlier paraphrases ('just above the subject's waistline tilted slightly down', 'least distorted view') are not on the pages and were removed. These are the basis for the 'camera at waist height' capture guidance; F14 gives the geometry."
+    },
+    {
+      "id": "fit-rules:F14",
+      "section": "fit-rules",
+      "status": "unverified",
+      "claim": "Pinhole-model computation (subject 1.70 m, hip joint at 0.90 m, body modelled as a vertical line, camera pitched to put the subject's mid-height at the image centre): apparent leg:(torso+head) ratio versus the true 1.125 is: at 1.4 m horizontal distance (about a 1x full-body framing) camera at 1.5 m -> -38%, 1.2 m -> -25%, 0.9 m -> -4%, 0.6 m -> +24%; at 2.0 m: 1.5 m -> -22%, 1.2 m -> -13%; at 2.8 m (about a 2x framing): 1.5 m -> -12.5%, 1.2 m -> -7%, 0.9 m -> -1%; at 4.0 m: 1.5 m -> -6.5%. With a level (unpitched) camera the ratio is unchanged at every height because the projection of a constant-depth vertical line is a pure scale; the distortion is driven by the pitch a photographer adds to keep the whole body in frame when the camera is not at mid-body height.",
+      "source": "own computation: /tmp/claude-0/-home-user-Glowing/f7ff31d2-4531-5c90-9cec-0f42a5267c60/scratchpad/geom.py (colleague) and /tmp/claude-0/-home-user-Glowing/f7ff31d2-4531-5c90-9cec-0f42a5267c60/scratchpad/scripts/geomcheck.py (independent re-derivation)",
+      "note": "I re-derived the model independently and reproduced every percentage (-37.6, -25.0, -4.2, +23.5; -22.2, -13.5; -12.5, -7.2, -1.1; -6.5). Pure geometry, no measured data; real bodies have 10-20 cm of depth (feet ahead of torso) so treat as indicative. Wording fix: the earlier '2.37 m head / 2.80 m feet at 2.5 m' are depths along the pitched optical axis for a 1.5 m-high camera (straight-line distances are 2.51 m and 2.92 m); either way the feet are about 16-18% farther than the head, which is the foreshortening the 2x/step-back advice shrinks. No published source quantifies this."
+    },
+    {
+      "id": "fit-rules:F16",
+      "section": "fit-rules",
+      "status": "verified",
+      "claim": "Apple tech-spec pages (read directly): iPhone 17 Pro and iPhone 17 Pro Max: '48MP Fusion Main: 24 mm, ƒ/1.78 aperture ... Also enables 12MP optical-quality 2x Telephoto: 48 mm, ƒ/1.78 aperture'; '48MP Fusion Ultra Wide: 13 mm, ƒ/2.2 aperture and 120° field of view'; '48MP Fusion Telephoto: 100 mm (4x), ƒ/2.8 aperture ... Also enables 12MP optical-quality 8x Telephoto: 200 mm'; '8x optical-quality zoom in, 2x optical zoom out; 16x optical-quality zoom range'; 'Lens correction (Fusion Ultra Wide)'; 'Customizable default lens (Fusion Main)'; Sensors list: 'Face ID, LiDAR Scanner, Barometer, High dynamic range gyro, High-g accelerometer, Proximity sensor, Dual ambient light sensors'. iPhone 17: '48MP Fusion Main: 26 mm, ƒ/1.6 aperture ... Also enables 12MP optical-quality 2x Telephoto: 52 mm', '48MP Fusion Ultra Wide: 13 mm, ƒ/2.2 aperture and 120° field of view', '2x optical zoom in, 2x optical zoom out; 4x optical zoom range', 'Lens correction (Fusion Ultra Wide)'; Sensors: Face ID, Barometer, High dynamic range gyro, High-g accelerometer, Proximity sensor, Dual ambient light sensors (no LiDAR Scanner). iPhone Air: '48MP Fusion Main: 26mm, ƒ/1.6 aperture ... 2x Telephoto: 52mm', no Ultra Wide; Sensors list identical to iPhone 17 (no LiDAR Scanner).",
+      "source": "https://support.apple.com/en-us/125090 ; https://support.apple.com/en-us/125091 ; https://support.apple.com/en-us/125089 ; https://support.apple.com/en-ie/125092 ; https://www.apple.com/iphone-17/specs/ ; https://www.apple.com/iphone-air/specs/",
+      "note": "Upgraded from likely: all four support.apple.com pages (17 Pro = 125090, 17 Pro Max = 125091, 17 = 125089, Air = 125092) were read directly, and the www.apple.com spec pages for iPhone 17 and iPhone Air agree. Within the iPhone 17 family only the Pro models carry a LiDAR Scanner, so metric scale (F20) is Pro-only on current hardware; Apple's LiDAR sample lists 'iPhone 12 Pro or later' as supporting devices (F19). No field-of-view figure is published for the 24/26/48/52/100 mm cameras (only the 13 mm ultra wide's 120°); read videoFieldOfView at runtime (F15). The 2x on every model is a sensor crop of the main camera ('optical-quality'), not a separate lens."
+    },
+    {
+      "id": "fit-rules:F17",
+      "section": "fit-rules",
+      "status": "unverified",
+      "claim": "Framing distance for a full-body shot computed from the 35 mm-equivalent focal lengths in portrait orientation, vertical extent 2.0 m (person plus margin): 13 mm (0.5x) about 0.72-0.75 m; 24 mm (Pro 1x) about 1.33-1.39 m; 26 mm (iPhone 17 / Air 1x) about 1.44-1.50 m; 48 mm (Pro 2x) about 2.67-2.77 m; 52 mm (iPhone 17 / Air 2x) about 2.89-3.00 m; 100 mm (4x) about 5.56-5.77 m. For a 1.8 m extent scale by 0.9 (Pro 1x about 1.20-1.25 m, Pro 2x about 2.40-2.49 m).",
+      "source": "own computation from the focal lengths in F16: /tmp/claude-0/-home-user-Glowing/f7ff31d2-4531-5c90-9cec-0f42a5267c60/scratchpad/scripts/geomcheck.py",
+      "note": "Independently reproduced; the range covers two conventions for the 'equivalent' (3:2 long side 36 mm vs a 4:3 diagonal-equivalent long side 34.6 mm). The Pro 2x distance sits inside Apple's stated 5 m LiDAR range (F18); the 4x telephoto distance exceeds it. Mirror selfies double the effective distance (F22): standing 1.0-1.4 m from the mirror at 1x already yields a 2.0-2.8 m virtual-image distance."
+    },
+    {
+      "id": "fit-rules:F20",
+      "section": "fit-rules",
+      "status": "verified",
+      "claim": "Vision's VNDetectHumanBodyPose3DRequest (iOS 17.0+, macOS 14.0+) is 'A request that detects points on human bodies in 3D space, relative to the camera'; 'If the system allows it, the request uses AVDepthData information to improve the accuracy'. Apple's article (read directly): Vision 'measures 17 individual joint locations in 3D space'; 'The request only supports the detection and results for the most prominent person in the frame, so it generates a single observation'; 'The framework doesn't return a partial list of joints, so you get all 17 joints or none'; 'The request doesn't require images with depth data to run. However, providing depth data improves detection accuracy'; positions are 'in meters' and 'relative to the scene in the real world, with an origin at the root joint, located between the leftHip and rightHip'; 'If there's enough depth metadata, bodyHeight provides an estimated height of the subject, in meters; otherwise, bodyHeight returns a reference height of 1.8 meters. The framework provides a measured height only when configuring an AVCaptureSession to use the LiDAR camera' (heightEstimation is .measured or .reference); cameraOriginMatrix is 'A transform from the skeleton hip to the camera'; cameraRelativePosition(_:) 'Returns a position relative to the camera for the body joint you specify' in meters; pointInImage(_:) projects a joint back to the 2D image. The 17 JointName values are topHead, centerHead, centerShoulder, leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist, leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle, root, spine. WWDC23 (session 111241): 'this height will either be a more accurate measured height or a reference height of 1.8 meters' and 'LiDAR is powerful because it allows for accurate scale and measurement of the scene'. The 2D VNDetectHumanBodyPoseRequest (iOS 14.0+) detects 'up to 19 unique body points' in normalized coordinates with per-point confidence: nose, leftEye, rightEye, leftEar, rightEar, neck, shoulders, elbows, wrists, root, hips, knees, ankles (it has no topHead/centerHead/centerShoulder/spine). ARKit's ARBodyTrackingConfiguration (iOS 13.0+) tracks a body whose 'default body is 1.8 meters tall', scaled by ARBodyAnchor.estimatedScaleFactor when automaticSkeletonScaleEstimationEnabled is true.",
+      "source": "https://developer.apple.com/tutorials/data/documentation/vision/vndetecthumanbodypose3drequest.json ; https://developer.apple.com/tutorials/data/documentation/vision/identifying-3d-human-body-poses-in-images.json ; https://developer.apple.com/tutorials/data/documentation/vision/vnhumanbodypose3dobservation/jointname.json ; https://developer.apple.com/tutorials/data/documentation/vision/vnhumanbodypose3dobservation/camerarelativeposition(_:).json ; https://developer.apple.com/videos/play/wwdc2023/111241/ ; https://developer.apple.com/tutorials/data/documentation/vision/detecting-human-body-poses-in-images.json ; https://developer.apple.com/tutorials/data/documentation/vision/vnhumanbodyposeobservation/jointname.json ; https://developer.apple.com/tutorials/data/documentation/arkit/arbodyanchor/estimatedscalefactor.json",
+      "note": "Correction: the 2D set is not a superset of the 3D set; it has nose/eyes/ears/neck but lacks the 3D set's topHead, centerHead, centerShoulder and spine. Architectural consequence unchanged: every cm-denominated rule (F1-F6, F9) needs metric scale, which Vision only has from a LiDAR capture session (or a user-entered height); ratio rules (F7) work from the reference-height skeleton. Apple publishes no numeric joint accuracy. The skeleton lacks the tailoring landmarks that are not joints (thumb knuckles, navel/natural waist, iliac crest, gluteal fold, acromion as distinct from the shoulder joint centre)."
+    },
+    {
+      "id": "fit-rules:F21",
+      "section": "fit-rules",
+      "status": "likely",
+      "claim": "A time-of-flight/LiDAR sensor looking into a mirror places the reflected object at its mirror-image location. A 2025 arXiv LiDAR-spoofing paper (read directly): 'The light follows a multi-hop path, but the LiDAR system assumes a direct line of sight and misinterprets the total travel time'; 'The system projects the total travel distance along the original emission direction, assuming a direct path. As a result, the reflected object appears at a false location, P_F, the geometric mirror image of the actual object'. Polycam's scanning guide (read directly): LiDAR can 'bounce off a mirror and create a false room in the scan'; 'The scanner doesn't know the path changed, so it records the object at the total distance traveled, creating a mirror image of the room behind the mirror'; 'If a mirror sends the beam away from the sensor, nothing comes back, so the scanner thinks there is empty space'; 'Very shallow angles make things worse, and scanning a mirror straight on can overwhelm the sensor'; its listed fixes are low-tack/painter's tape and matting sprays on the surface.",
+      "source": "https://arxiv.org/html/2509.17253v1 ; https://poly.cam/blog/how-to-handle-reflective-glass-and-mirrors-in-3d-scans",
+      "note": "Corrections: Polycam does not say 'cover large mirrors' in those words (its fixes are tape/matting spray and incidence angle); the ResearchGate 'virtual depth cameras' paper returned 403 and was dropped. The arXiv paper concerns automotive LiDAR, not Apple's; Apple's only primary statement is that highly reflective surfaces 'can lower the accuracy of the depth' (F19), which is about accuracy, not geometry."
+    },
+    {
+      "id": "fit-rules:F22",
+      "section": "fit-rules",
+      "status": "unverified",
+      "claim": "Physical reasoning for the mirror-selfie case: for a planar mirror the one-way path camera->mirror->subject point P equals the straight-line distance to P's virtual image P' (|CM| + |MP| = |CM| + |MP'| = |CP'| because M lies on segment CP' by the law of reflection), so a ToF sensor reporting range along the emission direction places the point exactly at P'. The depth map of a person seen in a mirror is therefore geometrically consistent: a left-right-flipped, isometric (length-preserving) copy of the subject at distance (camera-to-mirror + mirror-to-subject). Consequences: fit measurements and proportions survive; the effective distance doubles (F17), so range and per-pixel depth sampling degrade accordingly; the mirror frame/wall is seen at its true distance, giving a depth discontinuity at the mirror edge that can flag the mirror; the phone and hand occlude part of the torso; Vision's cameraOriginMatrix will describe the virtual (mirrored) camera and left/right joint labels will be swapped relative to the real person.",
+      "source": "own derivation; consistent with the 'geometric mirror image' statement in F21",
+      "note": "Unknowns no source settled: household-mirror reflectivity at the LiDAR wavelength (not published by Apple), signal loss from the double bounce and its effect on the confidence map (Polycam notes that a beam sent away from the sensor returns nothing, so parts of the scene can read as 'empty space'), and whether Apple's LiDAR+RGB fusion model degrades on mirrored scenes (Polycam reports that scanning a mirror straight on 'can overwhelm the sensor')."
+    },
+    {
+      "id": "fit-rules:F23",
+      "section": "fit-rules",
+      "status": "unverified",
+      "claim": "In principle depth can distinguish a boxy, standing-off garment from a fitted one: (a) garment edge vs joint offsets (sleeve-head seam vs shoulder joint, hem width vs hip/ankle joints) in metres; (b) depth discontinuities where a limb emerges from a sleeve or trouser hem at a different depth from the garment surface; (c) frontal standoff between the garment surface and a body surface inferred from the skeleton. Using the ease chart (F9), fitted garments imply roughly 1.2-1.6 cm of standoff per side and very loose ones 3.2 cm or more, so fitted-vs-semi-fitted needs about 1 cm depth precision while boxy-vs-fitted is a 3 cm-plus signal that also shows up as silhouette width exceeding skeleton width.",
+      "source": "own reasoning from F9 and F19",
+      "note": "The decisive unknown is iPhone LiDAR depth precision at 1.5-3 m, which no source read in this task quantifies (Apple's sample calls it 'high-precision' only qualitatively). Fabric drape adds surface noise that is itself a cue for volume. A fitted garment on a slim body and a boxy garment on a larger body can share a silhouette width, which is why joint-referenced offsets matter more than raw width."
+    },
+    {
+      "id": "fit-rules:F24",
+      "section": "fit-rules",
+      "status": "unverified",
+      "claim": "Geometrically, the styling rule 'one relaxed piece, the rest streamlined' (F10) means the garment-to-body offset (ease/standoff) is large in exactly one vertical zone (top or bottom) and near the wearing-ease minimum elsewhere; measurable as the ratio of silhouette width to skeleton width at shoulder, hip, knee and ankle heights and, with depth, as the standoff between garment surface and the skeleton-derived body surface, with the rule satisfied when only one zone exceeds a threshold (about 3 cm per side from F23).",
+      "source": "own reasoning from F9, F10, F23",
+      "note": "Pure reasoning; thresholds are inferred from the ease chart, not from styling sources, which never quantify 'oversized'."
+    },
+    {
+      "id": "fit-rules:F25",
+      "section": "fit-rules",
+      "status": "verified",
+      "claim": "Apple's own accuracy guidance for body-pose detection (article read directly): 'The subject's height should ideally be at least a third of the overall image height'; 'A large portion of the subject's key body regions and points should be present in the image'; 'A subject wearing flowing or robe-like clothing reduces the detection accuracy'; 'Attempting to detect body poses in dense crowd scenes is likely to produce inaccurate results'; setting a regionOfInterest 'generally results in more accurate pose estimation'; recognized points with confidence 0 are invalid.",
+      "source": "https://developer.apple.com/tutorials/data/documentation/vision/detecting-human-body-poses-in-images.json",
+      "note": "Added because it bears directly on a fashion app: dresses, coats and wide-leg trousers are exactly the 'flowing or robe-like' case Apple flags, so skeleton-referenced measurements will be least reliable on the garments where fit judgements matter most. Stated for the 2D request (iOS 14.0+); the 3D request page gives no separate guidance."
+    },
+    {
+      "id": "fit-rules:F26",
+      "section": "fit-rules",
+      "status": "verified",
+      "claim": "AVDepthData (iOS 11.0+, read directly): 'A depth map describes at each pixel the distance to an object, in meters'; disparity maps are 'in units of 1/meters'; depth maps 'contain nonrectilinear (nondistortion-corrected) data' whose 'values are warped to match the lens distortion characteristics present in the YUV image pixel buffers captured at the same time'; 'you can use an AVDepthData map as a proxy for depth when rendering effects to its accompanying image, but not to correlate points in 3D space. To use depth data for computer vision tasks, use the data in the cameraCalibrationData property to rectify the depth data'.",
+      "source": "https://developer.apple.com/tutorials/data/documentation/avfoundation/avdepthdata.json",
+      "note": "Added because the proposed pipeline lifts garment-edge pixels into 3D through the depth map (F15 note): Apple states this requires rectifying the depth map with AVCameraCalibrationData first, and filtering must be off for computer-vision use (F19)."
+    },
+    {
+      "id": "privacy-platform:A3",
+      "section": "privacy-platform",
+      "status": "likely",
+      "claim": "No additional permission, entitlement or Info.plist key beyond NSCameraUsageDescription is needed to read LiDAR/TrueDepth depth data through AVFoundation or ARKit on iOS.",
+      "source": "https://developer.apple.com/documentation/arkit/verifying-device-support-and-user-permission",
+      "note": "Absence-based inference, re-checked this session across four primary pages (AVFoundation authorization article, builtInLiDARDepthCamera page, ARFrame.sceneDepth page, ARKit permission article): none mentions any depth-specific authorization; the ARKit article says only 'the user must explicitly grant your app permission for camera access'. Kept at 'likely' because no Apple page states it affirmatively."
+    },
+    {
+      "id": "privacy-platform:A6",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "Apple's privacy-manifest 'required reason' API categories are exactly five: NSPrivacyAccessedAPICategoryFileTimestamp, SystemBootTime, DiskSpace, ActiveKeyboards and UserDefaults. No camera, depth, AVFoundation, ARKit or Vision API appears, so LiDAR/depth capture and body-pose analysis need no NSPrivacyAccessedAPITypes entry.",
+      "source": "https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitype",
+      "note": "Read via the data JSON endpoint; the five identifiers were extracted and the page searched for camera, depth, LiDAR, ARKit, Vision, AVFoundation (none present; the only AV mention is 'AVFAudio' inside reason 8FFB.1). Abstract: 'A string that describes a category of required reason API your app or third-party SDK uses.'"
+    },
+    {
+      "id": "privacy-platform:A11",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "App Review Guideline 5.1.2(i) reads: 'Unless otherwise permitted by law, you may not use, transmit, or share someone's personal data without first obtaining their permission. You must provide access to information about how and where the data will be used. You must clearly disclose where personal data will be shared with third parties, including with third-party AI, and obtain explicit permission before doing so. Data collected from apps may only be shared with third parties to improve the app or serve advertising (in compliance with the Apple Developer Program License Agreement)... Apps that share user data without user consent or otherwise complying with data privacy laws may be removed from sale and may result in your removal from the Apple Developer Program.' Apple's developer news item of November 13, 2025 ('Updated App Review Guidelines now available') lists this as: '5.1.2(i): Clarifies that you must clearly disclose where personal data will be shared with third parties, including with third-party AI, and obtain explicit permission before doing so.'",
+      "source": "https://developer.apple.com/app-store/review/guidelines/",
+      "note": "Guideline text and the news item (https://developer.apple.com/news/?id=ey6d8onl) both read this session; the guidelines page footer reads 'Last Updated: October 16, 2026'. The guideline does not say how the disclosure must be presented. 5.1.2(ii): 'Data collected for one purpose may not be repurposed without further consent unless otherwise explicitly permitted by law.' 5.1.2(iii): no surreptitious profiling or re-identification of data described as anonymized."
+    },
+    {
+      "id": "privacy-platform:A12",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "Guideline 5.1.2(vi): 'Data gathered from the HomeKit API, HealthKit, Clinical Health Records API, MovementDisorder APIs, ClassKit or from depth and/or facial mapping tools (such as ARKit, Camera APIs, or Photo APIs) may not be used for marketing, advertising or use-based data mining, including by third parties.'",
+      "source": "https://developer.apple.com/app-store/review/guidelines/",
+      "note": "Verified verbatim (page 'Last Updated: October 16, 2026'). Covers LiDAR/TrueDepth depth maps and body/face geometry derived from ARKit or the Camera APIs: usable for the advice feature, not for advertising, profiling or data mining by the app or by OpenAI."
+    },
+    {
+      "id": "privacy-platform:A13",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "Guideline 2.5.14: 'Apps must request explicit user consent and provide a clear visual and/or audible indication when recording, logging, or otherwise making a record of user activity. This includes any use of the device camera, microphone, screen recordings, or other user inputs.' The DPLA section 3.3.3(A) 'Recordings' independently requires that if the app 'captures or makes any video, microphone, screen recordings, or camera recordings, whether saved on the device or sent to a server (e.g., an image, photo, voice or speech capture, or other recording)', then 'a reasonably conspicuous audio, visual or other indicator must be displayed to the user as part of the Application to indicate that a Recording is taking place.'",
+      "source": "https://developer.apple.com/app-store/review/guidelines/",
+      "note": "Both texts verified verbatim. DPLA read from https://developer.apple.com/support/downloads/terms/apple-developer-program/Apple-Developer-Program-License-Agreement-English.pdf (document code LYL262, dated October 29, 2026). A hands-free/self-timer flow must keep the countdown and capture visibly or audibly indicated."
+    },
+    {
+      "id": "privacy-platform:A15",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "The DPLA's 'Face Data' clause (3.3.3(K)) applies to Glowing already and to any outfit photo that shows the face. 'Face Data' means 'information related to human faces (e.g., face mesh data, facial map data, face modeling data, facial coordinates or facial landmark data, including data from an uploaded photo) that is obtained from a user's device and/or through the use of the Apple Software (e.g., through ARKit, the Camera APIs, or the Photo APIs), or that is provided by a user in or through an Application (e.g., uploads for a facial analysis service).' Obligations: access Face Data 'only to provide a service or function that is directly relevant to the use of the Application'; 'inform users of Your intended uses and disclosures of Face Data by Your Application and to obtain clear and conspicuous consent from such users before any collection or use of Face Data'; no use 'for authentication, advertising, or marketing purposes'; no building 'a user profile'; no transfer to 'advertising platforms, analytics providers, data brokers, information resellers or other such parties'; and 'Face Data may not be shared or transferred off the user's device unless You have obtained clear and conspicuous consent for the transfer and the Face Data is used only in fulfilling a specific service or function for Your Application... You agree to require that Your service providers use Face Data only to the limited extent consented to by the user and only in accordance with these terms.'",
+      "source": "https://developer.apple.com/support/downloads/terms/apple-developer-program/Apple-Developer-Program-License-Agreement-English.pdf",
+      "note": "Verified verbatim in the Oct 29, 2026 agreement (section K sits on page 27 of the PDF). The full text contains no 'body data', 'body geometry' or 'biometric' term. 3.3.3(B): 'may not collect user or device data without prior user consent... and then only to provide a service or function that is directly relevant to the use of the Application'. Glowing's face-photo flow (C4) is 'uploads for a facial analysis service'."
+    },
+    {
+      "id": "privacy-platform:B11",
+      "section": "privacy-platform",
+      "status": "likely",
+      "claim": "Design assessment: keeping raw depth and body geometry on device and transmitting only garment-relative measurements materially improves the position under all four regimes, because (a) BIPA and CUBI turn on whether a 'scan/record of hand or face geometry' is created, stored or (for BIPA's identification-focused courts) linked to identity, and body-only measurements are outside their enumerated lists (height/weight expressly excluded in BIPA); (b) Washington's BPPA excludes photos and 'data generated therefrom' and requires data 'used to identify a specific individual', and MHMDA's biometric definition requires data that 'identifies a consumer'; (c) GDPR Art. 9 requires processing 'for the purpose of uniquely identifying a natural person'; and (d) FPF-summarised case law treats on-device-only, non-retained, unlinked processing as the lowest-exposure pattern. It does not eliminate ordinary obligations: consent and disclosure under Apple 5.1.1(i)-(ii)/5.1.2(i), the DPLA Face Data rules for any photo containing a face, GDPR lawful basis/transparency for the measurements and the photo, and health-data risk if the app infers weight/BMI-like attributes.",
+      "source": "https://fpf.org/blog/old-laws-new-tech-as-courts-wrestle-with-tough-questions-under-us-biometric-laws-immersive-tech-raises-new-challenges/",
+      "note": "Synthesis of B1-B10 and A8-A16; not found verbatim in any source and not legal advice. Residual risks: ARKit face tracking or hand-pose landmarks would re-create face/hand geometry (CUBI has no photo exclusion and the Texas AG reads it without an identification requirement); persisting a body profile tied to the account creates linkage; the RGB photo sent to OpenAI still contains the face, so DPLA Face Data consent and 5.1.2(i) AI disclosure apply regardless of the depth design."
+    },
+    {
+      "id": "privacy-platform:C1",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "OpenAI's vision input accepts only 'PNG (.png), JPEG (.jpeg or .jpg), WEBP (.webp), and non-animated GIF (.gif)'; limits are 'Up to 512 MB total payload per request', 'Up to 1,500 images per request' and 'up to 30,000 patches per image after applying the resizing rules for the selected model and detail level' (images exceeding it 'are rejected, not automatically resized to meet it'); 'The detail parameter controls image preprocessing. Supported values depend on the model: low, high, original, or auto. If you omit the parameter, it defaults to auto in both the Responses API and the Chat Completions API.' No depth map, point cloud, EXIF-depth or any non-RGB input type is documented, and 'The model doesn't process original file names or metadata. Images may be resized before analysis, including with original detail', so Apple's HEIC/JPEG embedded depth data would be discarded; depth must be reduced to numbers or an image on device. Documented limitations include 'Spatial reasoning: The model struggles with tasks requiring precise spatial localization, such as identifying chess positions', 'Counting: The model may give approximate counts for objects in images', 'Image shape: The model struggles with panoramic and fisheye images', 'Rotation: The model may misinterpret rotated or upside-down text and images', and 'Medical images: The model is not suitable for interpreting specialized medical images like CT scans and shouldn't be used for medical advice.'",
+      "source": "https://developers.openai.com/api/docs/guides/images-vision",
+      "note": "Read 2026-11-06 (via curl; the host does not resolve for WebFetch in this session). The limitations list also includes Non-English text, Small text, Visual elements, Accuracy and CAPTCHAs. The page's model sizing text mentions a '2048-pixel maximum' for some detail levels and 32px x 32px patches. The spatial-reasoning and counting caveats support computing proportions on device rather than asking the model to measure from pixels."
+    },
+    {
+      "id": "privacy-platform:C4",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "Glowing's current implementation: BackendAPIClient.swift has two paths selected by APIConfig.useMockBackend. Debug builds (useMockBackend = true, baseURL http://localhost:8080/api/v1) call https://api.openai.com/v1/chat/completions directly from the device with a key read from Keychain item 'com.glowing.openai-api-key'; release builds (useMockBackend = false, baseURL https://api.glowing-app.com/api/v1) POST to the app's backend (analyze/skin, analyze/onboarding, analyze/extract-details, analyze/outfit). Both paths send (a) four face photos ('Here are 4 face photos (front, left, right, smile) of a man') analysed with the system prompt 'You are a dermatologist and trichologist', and (b) an outfit photo via adviseOnOutfit(photoJPEG:goal:), as base64 'data:image/jpeg' image_url content with model 'gpt-4o' (the outfit request uses \"detail\": \"high\"). The project's NSCameraUsageDescription reads 'Glowing uses the camera to take progress photos that track your skin and grooming results over time, and to photograph your outfits for style advice.'",
+      "source": "/home/user/Glowing/Glowing/Services/BackendAPIClient.swift",
+      "note": "Also read: /home/user/Glowing/Glowing/Services/OutfitAdviceRequest.swift (chatCompletionBody and backendBody), /home/user/Glowing/Glowing/Services/APIConfig.swift, /home/user/Glowing/Glowing/Info.plist and INFOPLIST_KEY_NSCameraUsageDescription in /home/user/Glowing/Glowing.xcodeproj/project.pbxproj. Consequence unchanged: the face-photo flow already triggers DPLA Face Data consent duties (A15), the 5.1.2(i) third-party-AI disclosure (A11) and 5.1.1(i) privacy-policy content (A16) independent of any LiDAR work; a device-resident OpenAI key in debug builds is a separate security concern."
+    },
+    {
+      "id": "privacy-platform:D2",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "CIRP (US buyer survey data, post of Nov 04, 2026): 'the new iPhone 18 Pro and Pro Max accounted for 24% of US iPhone unit sales in the quarter (Chart 1). This is just ahead of the 21% for iPhone 17 Pro and Pro Max in the September 2025 quarter. Both pairs were available for about 2 weeks in those quarters.' 'Apple did not announce any update to the base model iPhone 17... Instead, Apple continues to sell the year-old iPhone 17, albeit at a $100 higher price.' In the December 2025 quarter (post of Jan 28, 2026): 'The four current iPhone 17 models accounted for an unprecedented 80% of sales, the highest share we have seen for the newest models in a December quarter.'",
+      "source": "https://cirpapple.substack.com/p/new-iphone-18-pro-and-pro-max-models",
+      "note": "Both CIRP posts read this session (free portions; the second at https://cirpapple.substack.com/p/first-full-quarter-of-iphone-17-model). The Nov 2026 post also says the folding iPhone Duo was announced in September 2026 with sales starting late October, and that the iPhone 17e was introduced in March 2026. These are shares of new US sales in a quarter, not of the installed base."
+    },
+    {
+      "id": "privacy-platform:D4",
+      "section": "privacy-platform",
+      "status": "likely",
+      "claim": "TelemetryDeck's published iPhone-model data (the page says 'Monthly updated charts based on usage data from 16M monthly active app users' and, in its about text, 'We collect usage data from over 10M monthly active users... Over 10k apps') for the week of 2026-10-26 lists ten models: iPhone 13 11.33%, iPhone 17 Pro 11.32%, iPhone 17 11.23%, iPhone 17 Pro Max 11.13%, iPhone 15 10.87%, iPhone 16 Pro 10.03%, iPhone 16 9.62%, iPhone 16 Pro Max 8.44%, iPhone 14 8.23%, iPhone 15 Pro 7.80%. LiDAR-capable models are 48.72% of that listed top-10 set (46.53% a year earlier, week of 2025-10-27, when the top 10 still included iPhone 14 Pro and 15 Pro Max). Because only the top 10 models are published, the LiDAR share across all active iPhones is most likely lower (the unlisted long tail is dominated by non-Pro models, though it also contains older Pro models), and TelemetryDeck itself points to 'biases in the TelemetryDeck data set'.",
+      "source": "https://telemetrydeck.com/survey/apple/iPhone/models/",
+      "note": "Page and CSV (https://cdn.sanity.io/files/8botbl6i/production/5b06346e99e688cee194d25c0e378af7343910a7.csv, 54 weekly snapshots of 10 models) read this session; percentages recomputed from the raw counts (e.g., 118,037 of 1,041,682 for iPhone 13; 507,496 LiDAR-model sessions of 1,041,682). The page's own text confirms the 11.33/11.32/11.23/11.13% figures. No credible published estimate of the LiDAR share of the global or US installed base was found. Planning assumption: roughly one-third to one-half of users have rear LiDAR, so depth must be optional with a photo-only fallback."
+    },
+    {
+      "id": "privacy-platform:E2",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "Apple Watch Camera Remote: 'With the Camera Remote app, you can use your Apple Watch as a viewfinder for your iPhone camera and take photos and videos from a distance. You can even control the flash, set a shutter timer, and review your shots right on Apple Watch.' 'By default, the shot is taken with a 3-second timer. Tap to turn off the timer or change other settings.' 'Zoom: Turn the Digital Crown.' 'To function as a camera remote, your Apple Watch needs to be within normal Bluetooth range of your iPhone (about 33 feet or 10 meters).' 'The photo is saved in the Photos app on your iPhone.' The page describes the iPhone's built-in camera ('When you open your iPhone camera, a hint appears at the bottom of your Apple Watch face... tap Camera Remote') and says nothing about third-party camera apps.",
+      "source": "https://support.apple.com/guide/watch/camera-remote-apda6e61c287/watchos",
+      "note": "Read this session. Whether a third-party iPhone app can be driven by the Watch's Camera Remote remains unverified (no Apple API found); a third-party app would need its own watchOS companion via WatchConnectivity."
+    },
+    {
+      "id": "privacy-platform:E3",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "AirPods can act as a shutter on iOS 26: 'You can use AirPods 4, AirPods 5, AirPods Pro 2, AirPods Pro 3, or AirPods Max 2 to take a photo or start recording a video in supported camera apps on your iPhone or iPad.' 'Note: Using AirPods as a camera remote or camera microphone is available in supported camera apps on devices with iOS 26, iPadOS 26, or later.' Setup: 'Tap Camera Remote (if you don't see that option, first tap Controls & Gestures), then tap either Press Once or Press and Hold.' 'If you select Press Once, media control gestures are temporarily unavailable while you use a supported camera app. If you select Press and Hold, listening modes and Siri gestures are temporarily unavailable while you use a supported camera app.'",
+      "source": "https://support.apple.com/guide/airpods/use-airpods-with-camera-apps-dev8e2a2ba2e/web",
+      "note": "Read this session. 'Supported camera apps' means apps that adopt AVCaptureEventInteraction / onCameraCaptureEvent (E4); on AirPods Max 2 the control is the Digital Crown. The page adds that AirPods can also serve as the microphone for supported camera apps."
+    },
+    {
+      "id": "privacy-platform:E4",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "WWDC25 session 253 ('Enhancing your camera experience with capture controls'): 'AVCaptureEventInteraction will also support primary actions triggered by clicks on either AirPod stem, specifically from AirPods equipped with the H2 chip... For those who have already adopted the API, this feature will come for free with iOS 26.' 'Primary actions are triggered by the volume down button, Action button, and the Camera Control, while the secondary action is triggered by the volume up button'; 'The system sends capture events only to apps that actively use the camera. Backgrounded capture apps, or those that do not have an active AVCaptureSession running, won't receive any events'; 'Adopting this API overrides default physical button behavior, so apps must always respond appropriately to any events received.' SwiftUI uses the onCameraCaptureEvent view modifier ('Adopting either of them will result in the same behavior'); iOS 26 adds 'a default tone for AirPods clicks', which can be replaced using the modifier's defaultSoundDisabled: parameter, event.shouldPlaySound ('will only be true if the capture action was triggered by an AirPod stem click') and event.play(.cameraShutter), because 'users may not be viewing the screen during capture'. The AVCaptureEventInteraction class (AVKit) is available iOS 17.2+ / iPadOS 17.2+ / Mac Catalyst 17.2+. Neither the session nor the class page mentions a self-timer or countdown.",
+      "source": "https://developer.apple.com/videos/play/wwdc2025/253/",
+      "note": "Transcript and class page (https://developer.apple.com/documentation/avkit/avcaptureeventinteraction) read this session. On the class the property is named defaultCaptureSoundDisabled ('A Boolean value that indicates whether the default sound is in a disabled state'); the SwiftUI sample uses .onCameraCaptureEvent(defaultSoundDisabled: true). Class page 'Important': 'You can only use this API for capture use cases... Backgrounded capture apps, and apps not performing capture, don't receive events.' For Glowing: adopting onCameraCaptureEvent gives volume-button, Action-button, Camera Control and AirPods-stem capture, but only while the capture session runs in the foreground."
+    },
+    {
+      "id": "privacy-platform:E5",
+      "section": "privacy-platform",
+      "status": "likely",
+      "claim": "AVFoundation provides no self-timer: AVCapturePhotoSettings (iOS 10.0+ / iPadOS 10.0+ / Mac Catalyst 14.0+ / macOS 10.15+ / tvOS 17.0+) documents flash, red-eye, max dimensions, quality prioritization, calibration and distortion correction, virtual-device fusion, shutter-sound suppression, preview/thumbnail formats, Live Photo, constant color, depth-data delivery, Portrait Effects and semantic segmentation mattes, and metadata; no property or method name or abstract contains 'timer', 'countdown', 'delay' or 'self-timer'. A countdown therefore has to be implemented by the app (its own timer, on-screen count and audible cues) before calling capturePhoto(with:delegate:).",
+      "source": "https://developer.apple.com/documentation/avfoundation/avcapturephotosettings",
+      "note": "Absence-based inference, re-checked this session against the full topic list on the page (via the data JSON endpoint) plus the WWDC25 capture-controls session. isShutterSoundSuppressionEnabled ('suppress the built-in shutter sound when capturing a photo') exists, but the DPLA/2.5.14 indicator rule (A13) means the countdown and capture should remain visibly or audibly indicated."
+    },
+    {
+      "id": "privacy-platform:E6",
+      "section": "privacy-platform",
+      "status": "verified",
+      "claim": "Voice Control (Settings > Accessibility > Voice Control) lets a user operate any app hands-free: 'Say, for example, \"Open Control Center,\" \"Go home,\" \"Tap item name,\" or \"Turn up volume.\" Or with Apple Intelligence, say \"Tap the button that sends the message\" or \"Tap the button at the bottom right.\"'; 'Say \"Show names,\" \"Show numbers,\" or \"Show text numbers.\"'; 'say a command—such as \"Long press\"—followed by the item's name or number'; 'Say \"Show grid.\"' It operates on an app's accessible control names, so a shutter button with a proper accessibility label can be triggered by saying its name. No Apple source was found stating that Siri can press the shutter in the Camera app or a third-party app.",
+      "source": "https://support.apple.com/guide/iphone/use-voice-control-iph2c21a3c88/ios",
+      "note": "Read this session (this is the iOS 27 edition of the guide: 'Apple Intelligence on iOS 27 or later is available on an Apple Intelligence-enabled iPhone 15 Pro, iPhone 15 Pro Max, or iPhone 16 model or later'; flexible item names require English). The Siri statement is a negative search result, unverified. Practical implication: give the capture button an accessibilityLabel like 'Take Photo' so 'Tap Take Photo' works without the app implementing speech recognition."
+    }
+  ]
+}
